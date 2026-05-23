@@ -101,3 +101,39 @@ curl localhost:8080/scan/{code}
 * Room - storage point
 * City (maybe with address)
 * Country
+
+## Printing instructions with NIIMBOT
+
+### PC/MAC
+
+You can print all needed labels in a batch with official NIIMBOT app
+
+1. You need to create right batch. To do so, mark needed assets with check box and click button to export CSV/XLSX
+
+<img alt="Choose assets" src="./docs/doc-1.png" width="1000"/>
+
+2. Open NIIMBOT app and click "+" button to create new template for labels
+
+<img alt="Create new template" src="./docs/doc-2.png" width="1000"/>
+
+3. After this we can import out exported Excel file to NIIMBOT
+
+<img alt="Choose Excel" src="./docs/doc-3.png" width="1000"/>
+
+4. You will be asked to choose items to use in your template
+
+<img alt="Choose items to print" src="./docs/doc-4.png" width="1000"/>
+
+5. Form to setup your template will be shown. Where you can see several zones
+
+1 - Exactly your label with actual size 
+
+2 - Data source with selected columns (you can enable/disable them here)
+
+3 - Preview carousel
+
+4 - Single element settings (here you can change display type: QR, BAR code, text, etc.)
+
+<img alt="Template settings" src="./docs/doc-5.png" width="1000"/>
+
+6. As the last step you can print it with Print button

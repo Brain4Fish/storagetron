@@ -1,0 +1,35 @@
+build-backend:
+  stage: build
+  before_script:
+    - docker login -u gitlab-runner -p $NEXUS_PASS nexus.lab.spb:5000
+    - export IMAGE_VERSION="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+    - export IMAGE_COMMIT="$CI_COMMIT_SHORT_SHA"
+    - export IMAGE_BUILD_DATE="$CI_COMMIT_TIMESTAMP"
+  script:
+    - >
+      docker build
+      --build-arg APP_VERSION="$IMAGE_VERSION"
+      --build-arg APP_COMMIT="$IMAGE_COMMIT"
+      --build-arg APP_BUILD_DATE="$IMAGE_BUILD_DATE"
+      -t nexus.lab.spb:5000/storagetron_backend:latest
+      -t nexus.lab.spb:5000/storagetron_backend:$IMAGE_VERSION
+      .
+    - docker push nexus.lab.spb:5000/storagetron_backend:latest
+    - docker push nexus.lab.spb:5000/storagetron_backend:$IMAGE_VERSION
+
+build-frontend:
+  stage: build
+  before_script:
+    - docker login -u gitlab-runner -p $NEXUS_PASS nexus.lab.spb:5000
+    - export IMAGE_VERSION="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+    - export IMAGE_COMMIT="$CI_COMMIT_SHORT_SHA"
+  script:
+    - >
+      docker build
+      --build-arg WEB_VERSION="$IMAGE_VERSION"
+      --build-arg WEB_COMMIT="$IMAGE_COMMIT"
+      -t nexus.lab.spb:5000/storagetron_frontend:latest
+      -t nexus.lab.spb:5000/storagetron_frontend:$IMAGE_VERSION
+      inventory-web
+    - docker push nexus.lab.spb:5000/storagetron_frontend:latest
+    - docker push nexus.lab.spb:5000/storagetron_frontend:$IMAGE_VERSION

@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    color-scheme: light;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    @apply bg-background text-foreground antialiased;
+    background: #f6f7f9;
+}
+
+* {
+    @apply border-border;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    @page {
+        size: 58mm 40mm;
+        margin: 0;
+    }
+
+    body:has(.print-label-print-root) * {
+        visibility: hidden !important;
+    }
+
+    body:has(.print-label-print-root) .print-label-print-root,
+    body:has(.print-label-print-root) .print-label-print-root * {
+        visibility: visible !important;
+    }
+
+    body:has(.print-label-print-root) .print-label-print-root {
+        position: fixed;
+        inset: 0 auto auto 0;
+        margin: 0;
+    }
+
+    body {
+        background: white;
+    }
+}
+
+.print-label-sheet {
+    width: 58mm;
+    height: 40mm;
+    overflow: hidden;
+    background: white;
+}
