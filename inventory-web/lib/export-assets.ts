@@ -287,3 +287,26 @@ export async function downloadSelectedAssetsXlsx(itemIds: Iterable<string>, file
         filename,
     );
 }
+
+export async function downloadSelectedKitsXlsx(containerIds: Iterable<string>, filename = "selected-kits.xlsx") {
+    const uniqueContainerIds = Array.from(new Set(containerIds));
+    if (uniqueContainerIds.length === 0) {
+        throw new Error("Choose at least one kit to export.");
+    }
+
+    const results = await Promise.allSettled(uniqueContainerIds.map((containerId) => api.getContainer(containerId)));
+    const containers = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+
+    if (containers.length === 0) {
+        throw new Error("Selected kits could not be loaded.");
+    }
+
+    return downloadInventoryRowsXlsx(
+        containers.map((container) => ({
+            name: container.name,
+            id: container.id,
+            link: `${window.location.origin}/kits/${container.id}`,
+        })),
+        filename,
+    );
+}
