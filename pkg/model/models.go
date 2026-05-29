@@ -7,12 +7,14 @@ import (
 )
 
 type Item struct {
-	ID          uuid.UUID  `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description,omitempty"`
-	LocationID  *uuid.UUID `json:"location_id,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	Photos      []Photo    `json:"photos"`
+	ID                uuid.UUID  `json:"id"`
+	Name              string     `json:"name"`
+	Description       string     `json:"description,omitempty"`
+	LocationID        *uuid.UUID `json:"location_id,omitempty"`
+	Location          *Location  `json:"location,omitempty"`
+	InheritedLocation *Location  `json:"inherited_location,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	Photos            []Photo    `json:"photos"`
 }
 
 type ItemListResponse struct {
@@ -27,6 +29,7 @@ type Container struct {
 	Name        string     `json:"name"`
 	Description string     `json:"description,omitempty"`
 	LocationID  *uuid.UUID `json:"location_id,omitempty"`
+	Location    *Location  `json:"location,omitempty"`
 	CreatedAt   time.Time  `json:"created_at,omitempty"`
 	Items       []Item     `json:"items,omitempty"`
 	ItemsCount  int        `json:"items_count,omitempty"`
@@ -36,7 +39,25 @@ type Container struct {
 type Location struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
+	Country   string    `json:"country"`
+	City      string    `json:"city"`
+	Room      string    `json:"room"`
+	Shelf     string    `json:"shelf"`
 	CreatedAt time.Time `json:"created_at,omitempty"`
+}
+
+type CreateLocationRequest struct {
+	Country string `json:"country"`
+	City    string `json:"city"`
+	Room    string `json:"room"`
+	Shelf   string `json:"shelf"`
+}
+
+type UpdateLocationRequest struct {
+	Country string `json:"country"`
+	City    string `json:"city"`
+	Room    string `json:"room"`
+	Shelf   string `json:"shelf"`
 }
 
 type Photo struct {

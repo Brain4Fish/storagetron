@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import {
     Dialog,
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { LocationSelect } from "@/components/forms/location-select";
 
 type Props = {
     open: boolean;
@@ -25,14 +26,20 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
     const queryClient = useQueryClient();
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
+    const [locationId, setLocationId] = useState("");
     const [error, setError] = useState("");
+    const { data: locations = [] } = useQuery({
+        queryKey: ["locations"],
+        queryFn: api.listLocations,
+    });
 
     const mutation = useMutation({
-        mutationFn: () => api.createContainer({ name, description }),
+        mutationFn: () => api.createContainer({ name, description, location_id: locationId || null }),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ["containers"] });
             setName("");
             setDescription("");
+            setLocationId("");
             setError("");
             onOpenChange(false);
         },
@@ -73,14 +80,21 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="container-description">Location or notes</Label>
+                        <Label htmlFor="container-description">Description</Label>
                         <Textarea
                             id="container-description"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Optional location, type, or contents note"
+                            placeholder="Optional type or contents note"
                         />
                     </div>
+
+                    <LocationSelect
+                        id="container-location"
+                        locations={locations}
+                        value={locationId}
+                        onChange={setLocationId}
+                    />
 
                     {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -97,4 +111,3 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
         </Dialog>
     );
 }
-

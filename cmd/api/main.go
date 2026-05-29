@@ -42,14 +42,17 @@ func main() {
 
 	itemRepo := repository.NewItemRepo(dbConn)
 	containerRepo := repository.NewContainerRepo(dbConn)
+	locationRepo := repository.NewLocationRepo(dbConn)
 	photoRepo := repository.NewPhotoRepo(dbConn)
 
 	photoSvc := service.NewPhotoService(photoRepo, s3Client)
 	itemSvc := service.NewItemService(itemRepo, photoSvc)
 	containerSvc := service.NewContainerService(containerRepo, photoSvc)
+	locationSvc := service.NewLocationService(locationRepo)
 
 	itemHandler := handler.NewItemHandler(itemSvc, logger)
 	containerHandler := handler.NewContainerHandler(containerSvc, logger)
+	locationHandler := handler.NewLocationHandler(locationSvc, logger)
 	photoHandler := handler.NewPhotoHandler(photoSvc, logger)
 	scanHandler := handler.NewScanHandler(itemSvc, containerSvc, logger)
 
@@ -89,6 +92,13 @@ func main() {
 			r.Delete("/{id}/items/{item_id}", containerHandler.RemoveItem)
 			r.Post("/{id}/photos", photoHandler.UploadContainer)
 			r.Delete("/{id}/photos/{photo_id}", photoHandler.DeleteContainerPhoto)
+		})
+
+		r.Route("/locations", func(r chi.Router) {
+			r.Post("/", locationHandler.Create)
+			r.Get("/", locationHandler.List)
+			r.Patch("/{id}", locationHandler.Update)
+			r.Delete("/{id}", locationHandler.Delete)
 		})
 
 		r.Get("/scan/{code}", scanHandler.Scan)

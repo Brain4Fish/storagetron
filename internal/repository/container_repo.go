@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/Brain4Fish/storagetron/pkg/model"
 
@@ -49,10 +50,13 @@ func (r *ContainerRepo) Create(ctx context.Context, c model.Container, labelCode
 
 func (r *ContainerRepo) List(ctx context.Context) ([]model.Container, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT c.id, c.name, COALESCE(c.description, ''), c.location_id, c.created_at, COUNT(ic.item_id)
+		SELECT
+			c.id, c.name, COALESCE(c.description, ''), c.location_id, c.created_at, COUNT(ic.item_id),
+			l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at
 		FROM containers c
 		LEFT JOIN item_container ic ON ic.container_id = c.id
-		GROUP BY c.id
+		LEFT JOIN locations l ON l.id = c.location_id
+		GROUP BY c.id, l.id
 		ORDER BY c.created_at DESC
 	`)
 	if err != nil {
@@ -63,7 +67,7 @@ func (r *ContainerRepo) List(ctx context.Context) ([]model.Container, error) {
 	containers := make([]model.Container, 0)
 	for rows.Next() {
 		var c model.Container
-		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.LocationID, &c.CreatedAt, &c.ItemsCount); err != nil {
+		if err := scanContainerWithLocation(rows, &c); err != nil {
 			return nil, err
 		}
 		items, err := r.getContainerItems(ctx, c.ID)
@@ -78,11 +82,14 @@ func (r *ContainerRepo) List(ctx context.Context) ([]model.Container, error) {
 
 func (r *ContainerRepo) Get(ctx context.Context, id uuid.UUID) (model.Container, error) {
 	var c model.Container
-	err := r.db.QueryRow(ctx, `
-		SELECT id, name, COALESCE(description, ''), location_id, created_at
-		FROM containers
-		WHERE id = $1
-	`, id).Scan(&c.ID, &c.Name, &c.Description, &c.LocationID, &c.CreatedAt)
+	err := scanContainerWithLocation(r.db.QueryRow(ctx, `
+		SELECT
+			c.id, c.name, COALESCE(c.description, ''), c.location_id, c.created_at, 0,
+			l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at
+		FROM containers c
+		LEFT JOIN locations l ON l.id = c.location_id
+		WHERE c.id = $1
+	`, id), &c)
 	if err != nil {
 		return model.Container{}, err
 	}
@@ -193,9 +200,15 @@ func (r *ContainerRepo) GetLabelByCode(ctx context.Context, code string) (*model
 
 func (r *ContainerRepo) getContainerItems(ctx context.Context, containerID uuid.UUID) ([]model.Item, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at
+		SELECT
+			i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at,
+			l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at,
+			cl.id, COALESCE(cl.name, ''), COALESCE(cl.country, ''), COALESCE(cl.city, ''), COALESCE(cl.room, ''), COALESCE(cl.shelf, ''), cl.created_at
 		FROM items i
 		INNER JOIN item_container ic ON ic.item_id = i.id
+		INNER JOIN containers c ON c.id = ic.container_id
+		LEFT JOIN locations l ON l.id = i.location_id
+		LEFT JOIN locations cl ON cl.id = c.location_id
 		WHERE ic.container_id = $1
 		ORDER BY i.created_at DESC
 	`, containerID)
@@ -207,10 +220,30 @@ func (r *ContainerRepo) getContainerItems(ctx context.Context, containerID uuid.
 	var items []model.Item
 	for rows.Next() {
 		var item model.Item
-		if err := rows.Scan(&item.ID, &item.Name, &item.Description, &item.LocationID, &item.CreatedAt); err != nil {
+		if err := scanItemWithLocations(rows, &item); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+func scanContainerWithLocation(row scanner, container *model.Container) error {
+	var location model.Location
+	var locationID *uuid.UUID
+	var locationCreatedAt *time.Time
+	if err := row.Scan(
+		&container.ID, &container.Name, &container.Description, &container.LocationID, &container.CreatedAt, &container.ItemsCount,
+		&locationID, &location.Name, &location.Country, &location.City, &location.Room, &location.Shelf, &locationCreatedAt,
+	); err != nil {
+		return err
+	}
+	if locationID != nil {
+		location.ID = *locationID
+		if locationCreatedAt != nil {
+			location.CreatedAt = *locationCreatedAt
+		}
+		container.Location = &location
+	}
+	return nil
 }

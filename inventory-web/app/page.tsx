@@ -1,16 +1,18 @@
 import Link from "next/link";
-import { Box, Package, QrCode, Printer } from "lucide-react";
+import { Box, MapPin, Package, QrCode, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageShell } from "@/components/page-shell";
 
 export default function HomePage() {
     return (
         <PageShell>
-            <div className="grid gap-6 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-5">
                 <Link href="/items">
-                    <Card className="h-full rounded-2xl shadow-soft transition hover:-translate-y-0.5">
+                    <Card className="h-full transition hover:-translate-y-0.5">
                         <CardHeader>
-                            <Package className="h-6 w-6" />
+                            <span className="soft-bubble flex h-10 w-10 items-center justify-center rounded-full">
+                                <Package className="h-5 w-5" />
+                            </span>
                             <CardTitle>Items</CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm text-muted-foreground">
@@ -20,9 +22,11 @@ export default function HomePage() {
                 </Link>
 
                 <Link href="/kits">
-                    <Card className="h-full rounded-2xl shadow-soft transition hover:-translate-y-0.5">
+                    <Card className="h-full transition hover:-translate-y-0.5">
                         <CardHeader>
-                            <Box className="h-6 w-6" />
+                            <span className="soft-bubble flex h-10 w-10 items-center justify-center rounded-full">
+                                <Box className="h-5 w-5" />
+                            </span>
                             <CardTitle>Kits</CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm text-muted-foreground">
@@ -32,9 +36,11 @@ export default function HomePage() {
                 </Link>
 
                 <Link href="/scan">
-                    <Card className="h-full rounded-2xl shadow-soft transition hover:-translate-y-0.5">
+                    <Card className="h-full transition hover:-translate-y-0.5">
                         <CardHeader>
-                            <QrCode className="h-6 w-6" />
+                            <span className="soft-bubble flex h-10 w-10 items-center justify-center rounded-full">
+                                <QrCode className="h-5 w-5" />
+                            </span>
                             <CardTitle>Scan</CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm text-muted-foreground">
@@ -43,10 +49,26 @@ export default function HomePage() {
                     </Card>
                 </Link>
 
-                <Link href="/print/items">
-                    <Card className="h-full rounded-2xl shadow-soft transition hover:-translate-y-0.5">
+                <Link href="/locations">
+                    <Card className="h-full transition hover:-translate-y-0.5">
                         <CardHeader>
-                            <Printer className="h-6 w-6" />
+                            <span className="soft-bubble flex h-10 w-10 items-center justify-center rounded-full">
+                                <MapPin className="h-5 w-5" />
+                            </span>
+                            <CardTitle>Locations</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm text-muted-foreground">
+                            Manage country, city, room, and shelf records.
+                        </CardContent>
+                    </Card>
+                </Link>
+
+                <Link href="/print/items">
+                    <Card className="h-full transition hover:-translate-y-0.5">
+                        <CardHeader>
+                            <span className="soft-bubble flex h-10 w-10 items-center justify-center rounded-full">
+                                <Printer className="h-5 w-5" />
+                            </span>
                             <CardTitle>Print</CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm text-muted-foreground">

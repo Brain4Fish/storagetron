@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -11,31 +11,11 @@ import { ItemsTable } from "@/components/table/items-table";
 import { CreateItemDialog } from "@/components/forms/create-item-dialog";
 import { Button } from "@/components/ui/button";
 
-const SELECTED_ASSETS_STORAGE_KEY = "storagetron:selected-assets";
 const ITEMS_PAGE_SIZE = 25;
-
-function getSavedSelectedItemIds() {
-    try {
-        const saved = window.localStorage.getItem(SELECTED_ASSETS_STORAGE_KEY);
-        if (!saved) {
-            return new Set<string>();
-        }
-
-        const itemIds = JSON.parse(saved);
-        if (!Array.isArray(itemIds)) {
-            return new Set<string>();
-        }
-
-        return new Set(itemIds.filter((id) => typeof id === "string"));
-    } catch {
-        return new Set<string>();
-    }
-}
 
 export default function ItemsPage() {
     const [open, setOpen] = useState(false);
     const [page, setPage] = useState(0);
-    const [selectionReady, setSelectionReady] = useState(false);
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState("");
@@ -52,22 +32,6 @@ export default function ItemsPage() {
     const canGoPrevious = page > 0;
     const canGoNext = page + 1 < totalPages;
     const selectedCount = selectedItemIds.size;
-
-    useEffect(() => {
-        setSelectedItemIds(getSavedSelectedItemIds());
-        setSelectionReady(true);
-    }, []);
-
-    useEffect(() => {
-        if (!selectionReady) {
-            return;
-        }
-
-        window.localStorage.setItem(
-            SELECTED_ASSETS_STORAGE_KEY,
-            JSON.stringify(Array.from(selectedItemIds)),
-        );
-    }, [selectedItemIds, selectionReady]);
 
     const selectedItems = useMemo(
         () => items.filter((item) => selectedItemIds.has(item.id)),
@@ -121,9 +85,9 @@ export default function ItemsPage() {
 
     return (
         <PageShell>
-            <div className="space-y-6">
+            <div className="space-y-3">
                 {/* Header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <h1 className="text-2xl font-semibold">Assets</h1>
 
                     <div className="flex flex-wrap gap-2">
@@ -137,7 +101,7 @@ export default function ItemsPage() {
                 </div>
 
                 {selectedCount > 0 ? (
-                    <div className="flex flex-col gap-3 rounded-xl border bg-white p-4 text-sm shadow-soft sm:flex-row sm:items-center sm:justify-between">
+                    <div className="floating-window flex flex-col gap-2 rounded-2xl p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <span className="font-medium">{selectedCount} selected</span>
                             {selectedItems.length > 0 ? (
@@ -161,7 +125,7 @@ export default function ItemsPage() {
                 {isLoading ? (
                     <p className="text-gray-500">Loading...</p>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         <ItemsTable
                             items={items}
                             selectedItemIds={selectedItemIds}
@@ -169,7 +133,7 @@ export default function ItemsPage() {
                             onToggleItems={toggleItems}
                         />
 
-                        <div className="flex flex-col gap-3 rounded-xl border bg-white p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                        <div className="floating-window flex flex-col gap-2 rounded-2xl p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 {totalItems === 0 ? "No assets" : `Showing ${pageStart}-${pageEnd} of ${totalItems}`}
                                 {isFetching ? <span> · Updating...</span> : null}

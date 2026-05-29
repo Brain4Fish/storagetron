@@ -27,6 +27,8 @@ export type Item = {
     name: string;
     description?: string;
     location_id?: string;
+    location?: Location;
+    inherited_location?: Location;
     created_at: string;
     photos?: Photo[];
 };
@@ -43,10 +45,21 @@ export type Container = {
     name: string;
     description?: string;
     location_id?: string;
+    location?: Location;
     created_at: string;
     items?: Item[];
     items_count?: number;
     photos?: Photo[];
+};
+
+export type Location = {
+    id: string;
+    name: string;
+    country?: string;
+    city?: string;
+    room?: string;
+    shelf?: string;
+    created_at?: string;
 };
 
 type ScanResult = {
@@ -174,6 +187,13 @@ export const api = {
         }),
     deleteContainerPhoto: (containerId: string, photoId: string) =>
         request<void>(`/containers/${containerId}/photos/${photoId}`, { method: "DELETE" }),
+    listLocations: () => request<Location[]>("/locations"),
+    createLocation: (data: any) =>
+        request<Location>("/locations", { method: "POST", body: JSON.stringify(data) }),
+    updateLocation: (id: string, data: any) =>
+        request<Location>(`/locations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteLocation: (id: string) =>
+        request<void>(`/locations/${id}`, { method: "DELETE" }),
     scanCode: (code: string) =>
         request<ScanResult>(`/scan/${encodeURIComponent(normalizeScanCode(code))}`),
 };

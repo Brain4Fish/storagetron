@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Item } from "@/lib/api";
+import { effectiveItemLocation, formatLocation, isInheritedItemLocation } from "@/lib/location";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -15,7 +16,7 @@ type ItemsTableProps = {
 export function ItemsTable({ items, selectedItemIds, onToggleItem, onToggleItems }: ItemsTableProps) {
     if (items.length === 0) {
         return (
-            <div className="rounded-xl border bg-white p-6 text-sm text-gray-500">
+            <div className="floating-window rounded-2xl p-5 text-sm text-muted-foreground">
                 No assets yet.
             </div>
         );
@@ -27,12 +28,12 @@ export function ItemsTable({ items, selectedItemIds, onToggleItem, onToggleItems
     const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
 
     return (
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="floating-window overflow-hidden rounded-2xl">
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[680px] text-sm">
-                    <thead className="bg-gray-50 text-gray-500">
+                    <thead className="bg-white/45 text-muted-foreground">
                     <tr>
-                        <th className="w-12 p-3 text-left">
+                        <th className="w-11 p-2.5 text-left">
                             <input
                                 type="checkbox"
                                 aria-label="Select all visible assets"
@@ -44,17 +45,18 @@ export function ItemsTable({ items, selectedItemIds, onToggleItem, onToggleItems
                                 className="h-4 w-4 rounded border-gray-300 accent-orange-600"
                             />
                         </th>
-                        <th className="p-3 text-left">Name</th>
-                        <th className="p-3 text-left">Status</th>
-                        <th className="p-3 text-left">Created</th>
-                        <th className="p-3 text-right"></th>
+                        <th className="p-2.5 text-left">Name</th>
+                        <th className="p-2.5 text-left">Location</th>
+                        <th className="p-2.5 text-left">Status</th>
+                        <th className="p-2.5 text-left">Created</th>
+                        <th className="p-2.5 text-right"></th>
                     </tr>
                     </thead>
 
                     <tbody>
                     {items.map((item) => (
-                        <tr key={item.id} className="border-t hover:bg-gray-50">
-                            <td className="p-3">
+                        <tr key={item.id} className="border-t border-white/60 hover:bg-white/45">
+                            <td className="p-2.5">
                                 <input
                                     type="checkbox"
                                     aria-label={`Select ${item.name}`}
@@ -63,8 +65,8 @@ export function ItemsTable({ items, selectedItemIds, onToggleItem, onToggleItems
                                     className="h-4 w-4 rounded border-gray-300 accent-orange-600"
                                 />
                             </td>
-                            <td className="p-3 flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gray-200 rounded-lg overflow-hidden">
+                            <td className="flex items-center gap-2.5 p-2.5">
+                                <div className="h-9 w-9 overflow-hidden rounded-full bg-white/70 shadow-inner">
                                     {item.photos?.[0]?.url ? (
                                         <img
                                             src={item.photos[0].url}
@@ -72,7 +74,7 @@ export function ItemsTable({ items, selectedItemIds, onToggleItem, onToggleItems
                                         />
                                     ) : (
 
-                                        <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+                                        <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
                                             📦
                                         </div>
                                     )}
@@ -84,17 +86,28 @@ export function ItemsTable({ items, selectedItemIds, onToggleItem, onToggleItems
                                 </div>
                             </td>
 
-                            <td className="p-3">
-                                <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full text-xs">
+                            <td className="p-2.5">
+                                {formatLocation(effectiveItemLocation(item)) ? (
+                                    <span className="soft-bubble rounded-full px-2 py-1 text-xs text-zinc-700">
+                                        {formatLocation(effectiveItemLocation(item))}
+                                        {isInheritedItemLocation(item) ? " (kit)" : ""}
+                                    </span>
+                                ) : (
+                                    <span className="text-xs text-muted-foreground">No location</span>
+                                )}
+                            </td>
+
+                            <td className="p-2.5">
+                                <span className="soft-bubble rounded-full px-2 py-1 text-xs text-emerald-700">
                                     Available
                                 </span>
                             </td>
 
-                            <td className="p-3 text-gray-500">
+                            <td className="p-2.5 text-muted-foreground">
                                 {formatDate(item.created_at)}
                             </td>
 
-                            <td className="p-3 text-right">
+                            <td className="p-2.5 text-right">
                                 <Link href={`/items/${item.id}`}>
                                     <Button size="sm" variant="outline">
                                         Open

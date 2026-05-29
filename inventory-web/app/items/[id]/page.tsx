@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { downloadSelectedAssetsXlsx } from "@/lib/export-assets";
 import { PageShell } from "@/components/page-shell";
 import { formatDate } from "@/lib/utils";
+import { effectiveItemLocation, formatLocation, isInheritedItemLocation } from "@/lib/location";
 import { UploadPhotoForm } from "@/components/forms/upload-photo-form";
 import { ItemPhotos } from "@/components/item-photos";
 import { QRCode } from "@/components/qr/qr-code";
@@ -29,9 +30,13 @@ export default function ItemDetailsPage() {
         queryKey: ["item", id],
         queryFn: () => api.getItem(id),
     });
+    const { data: locations = [] } = useQuery({
+        queryKey: ["locations"],
+        queryFn: api.listLocations,
+    });
 
     const updateMutation = useMutation({
-        mutationFn: (payload: { name: string; description: string }) => api.updateItem(id, payload),
+        mutationFn: (payload: { name: string; description: string; location_id?: string | null }) => api.updateItem(id, payload),
         onSuccess: async () => {
             setEditError("");
             setEditOpen(false);
@@ -117,6 +122,14 @@ export default function ItemDetailsPage() {
                             <div className="text-gray-500">Created</div>
                             <div>{formatDate(data.created_at)}</div>
 
+                            <div className="text-gray-500">Location</div>
+                            <div>
+                                {formatLocation(effectiveItemLocation(data)) || "No location"}
+                                {isInheritedItemLocation(data) ? (
+                                    <span className="ml-2 text-xs text-muted-foreground">Inherited from kit</span>
+                                ) : null}
+                            </div>
+
                             <div className="text-gray-500">Description</div>
                             <div>{data.description || "-"}</div>
                         </div>
@@ -176,6 +189,8 @@ export default function ItemDetailsPage() {
                 description="Rename this asset or update its description."
                 name={data.name}
                 details={data.description}
+                locationId={data.location_id ?? ""}
+                locations={locations}
                 isSaving={updateMutation.isPending}
                 error={editError}
                 onOpenChange={setEditOpen}

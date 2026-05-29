@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -10,29 +10,8 @@ import { Button } from "@/components/ui/button";
 import { CreateContainerDialog } from "@/components/forms/create-container-dialog";
 import { ContainersTable } from "@/components/table/containers-table";
 
-const SELECTED_KITS_STORAGE_KEY = "storagetron:selected-kits";
-
-function getSavedSelectedContainerIds() {
-    try {
-        const saved = window.localStorage.getItem(SELECTED_KITS_STORAGE_KEY);
-        if (!saved) {
-            return new Set<string>();
-        }
-
-        const containerIds = JSON.parse(saved);
-        if (!Array.isArray(containerIds)) {
-            return new Set<string>();
-        }
-
-        return new Set(containerIds.filter((id) => typeof id === "string"));
-    } catch {
-        return new Set<string>();
-    }
-}
-
 export default function KitsPage() {
     const [open, setOpen] = useState(false);
-    const [selectionReady, setSelectionReady] = useState(false);
     const [selectedContainerIds, setSelectedContainerIds] = useState<Set<string>>(() => new Set());
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState("");
@@ -42,22 +21,6 @@ export default function KitsPage() {
     });
     const containers = data ?? [];
     const selectedCount = selectedContainerIds.size;
-
-    useEffect(() => {
-        setSelectedContainerIds(getSavedSelectedContainerIds());
-        setSelectionReady(true);
-    }, []);
-
-    useEffect(() => {
-        if (!selectionReady) {
-            return;
-        }
-
-        window.localStorage.setItem(
-            SELECTED_KITS_STORAGE_KEY,
-            JSON.stringify(Array.from(selectedContainerIds)),
-        );
-    }, [selectedContainerIds, selectionReady]);
 
     const selectedContainers = useMemo(
         () => containers.filter((container) => selectedContainerIds.has(container.id)),
@@ -110,17 +73,17 @@ export default function KitsPage() {
 
     return (
         <PageShell>
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
+            <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-semibold">Kits</h1>
-                        <p className="text-sm text-gray-500">Boxes, shelves, rooms, and grouped assets.</p>
+                        <p className="text-sm text-muted-foreground">Boxes, shelves, rooms, and grouped assets.</p>
                     </div>
                     <Button onClick={() => setOpen(true)}>New kit</Button>
                 </div>
 
                 {selectedCount > 0 ? (
-                    <div className="flex flex-col gap-3 rounded-xl border bg-white p-4 text-sm shadow-soft sm:flex-row sm:items-center sm:justify-between">
+                    <div className="floating-window flex flex-col gap-2 rounded-2xl p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <span className="font-medium">{selectedCount} selected</span>
                             {selectedContainers.length > 0 ? (

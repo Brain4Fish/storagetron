@@ -1,9 +1,11 @@
 import { api } from "@/lib/api";
+import { effectiveItemLocation, formatLocation } from "@/lib/location";
 
 type InventoryExportRow = {
     name: string;
     id: string;
     link: string;
+    location?: string;
 };
 
 type ZipFile = {
@@ -258,8 +260,8 @@ export function downloadInventoryRowsXlsx(
     downloadXlsx(
         filename,
         [
-            ["Name", "UUID", "Link"],
-            ...rows.map((row) => [row.name, row.id, row.link]),
+            ["Name", "UUID", "Link", "Location"],
+            ...rows.map((row) => [row.name, row.id, row.link, row.location ?? ""]),
         ],
     );
     return rows.length;
@@ -283,6 +285,7 @@ export async function downloadSelectedAssetsXlsx(itemIds: Iterable<string>, file
             name: item.name,
             id: item.id,
             link: `${window.location.origin}/items/${item.id}`,
+            location: formatLocation(effectiveItemLocation(item)),
         })),
         filename,
     );
@@ -306,6 +309,7 @@ export async function downloadSelectedKitsXlsx(containerIds: Iterable<string>, f
             name: container.name,
             id: container.id,
             link: `${window.location.origin}/kits/${container.id}`,
+            location: formatLocation(container.location),
         })),
         filename,
     );

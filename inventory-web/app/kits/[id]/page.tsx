@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Box, Download } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, Item } from "@/lib/api";
 import { downloadInventoryRowsXlsx, downloadSelectedAssetsXlsx } from "@/lib/export-assets";
+import { formatLocation } from "@/lib/location";
 import { PageShell } from "@/components/page-shell";
 import { QRCode } from "@/components/qr/qr-code";
 import { KitItemsTable } from "@/components/table/kit-items-table";
@@ -15,28 +16,6 @@ import { UploadPhotoForm } from "@/components/forms/upload-photo-form";
 import { Button } from "@/components/ui/button";
 import { PrintLabelDialog } from "@/components/print-label-dialog";
 import { EditRecordDialog } from "@/components/forms/edit-record-dialog";
-
-function getSelectedKitItemsStorageKey(kitId: string) {
-    return `storagetron:kits:${kitId}:selected-assets`;
-}
-
-function getSavedSelectedKitItemIds(kitId: string) {
-    try {
-        const saved = window.localStorage.getItem(getSelectedKitItemsStorageKey(kitId));
-        if (!saved) {
-            return new Set<string>();
-        }
-
-        const itemIds = JSON.parse(saved);
-        if (!Array.isArray(itemIds)) {
-            return new Set<string>();
-        }
-
-        return new Set(itemIds.filter((itemId) => typeof itemId === "string"));
-    } catch {
-        return new Set<string>();
-    }
-}
 
 export default function KitDetailsPage() {
     const params = useParams();
@@ -47,7 +26,6 @@ export default function KitDetailsPage() {
     const [editOpen, setEditOpen] = useState(false);
     const [editError, setEditError] = useState("");
     const [removingItemId, setRemovingItemId] = useState("");
-    const [selectedItemsStorageKey, setSelectedItemsStorageKey] = useState("");
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
     const [isExporting, setIsExporting] = useState(false);
     const [isExportingKit, setIsExportingKit] = useState(false);
@@ -68,6 +46,10 @@ export default function KitDetailsPage() {
         queryKey: ["containers"],
         queryFn: api.listContainers,
     });
+    const { data: locations = [] } = useQuery({
+        queryKey: ["locations"],
+        queryFn: api.listLocations,
+    });
 
     const kitItems = useMemo(() => {
         const containerItems = containerQuery.data?.items ?? [];
@@ -80,24 +62,6 @@ export default function KitDetailsPage() {
         [kitItems, selectedItemIds],
     );
     const selectedCount = selectedItemIds.size;
-
-    useEffect(() => {
-        const storageKey = getSelectedKitItemsStorageKey(id);
-        setSelectedItemIds(getSavedSelectedKitItemIds(id));
-        setSelectedItemsStorageKey(storageKey);
-    }, [id]);
-
-    useEffect(() => {
-        const storageKey = getSelectedKitItemsStorageKey(id);
-        if (selectedItemsStorageKey !== storageKey) {
-            return;
-        }
-
-        window.localStorage.setItem(
-            storageKey,
-            JSON.stringify(Array.from(selectedItemIds)),
-        );
-    }, [id, selectedItemIds, selectedItemsStorageKey]);
 
     const availableItems = useMemo(() => {
         const assignedItems = new Set(
@@ -125,7 +89,7 @@ export default function KitDetailsPage() {
     });
 
     const updateMutation = useMutation({
-        mutationFn: (payload: { name: string; description: string }) => api.updateContainer(id, payload),
+        mutationFn: (payload: { name: string; description: string; location_id?: string | null }) => api.updateContainer(id, payload),
         onSuccess: async () => {
             setEditError("");
             setEditOpen(false);
@@ -236,6 +200,7 @@ export default function KitDetailsPage() {
                         name: kit.name,
                         id: kit.id,
                         link: `${window.location.origin}/kits/${kit.id}`,
+                        location: formatLocation(kit.location),
                     },
                 ],
                 `${kit.name}-kit.xlsx`,
@@ -282,37 +247,17 @@ export default function KitDetailsPage() {
                             {container.description ? (
                                 <p className="mt-1 text-sm text-gray-500">{container.description}</p>
                             ) : null}
-                            <span className="mt-2 inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-700">
-                                {kitItems.length} items
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl border bg-white p-4">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-                            <div className="flex-1 space-y-2">
-                                <label htmlFor="kit-item" className="text-sm font-medium">
-                                    Add asset
-                                </label>
-                                <select
-                                    id="kit-item"
-                                    value={selectedItemId}
-                                    onChange={(event) => setSelectedItemId(event.target.value)}
-                                    className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm"
-                                >
-                                    <option value="">Choose an asset</option>
-                                    {availableItems.map((item: Item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                                </select>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                <span className="inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-700">
+                                    {kitItems.length} items
+                                </span>
+                                {formatLocation(container.location) ? (
+                                    <span className="soft-bubble inline-flex rounded-full px-2 py-1 text-xs text-zinc-700">
+                                        {formatLocation(container.location)}
+                                    </span>
+                                ) : null}
                             </div>
-                            <Button onClick={addSelectedItem} disabled={addMutation.isPending}>
-                                {addMutation.isPending ? "Adding..." : "Add to kit"}
-                            </Button>
                         </div>
-                        {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
                     </div>
 
                     <div className="space-y-3">
@@ -348,7 +293,7 @@ export default function KitDetailsPage() {
                     </div>
                 </div>
 
-                <aside className="space-y-4 lg:sticky lg:top-6 lg:min-h-[calc(100dvh-3rem)] lg:self-start">
+                <aside className="space-y-3 lg:sticky lg:top-6 lg:min-h-[calc(100dvh-3rem)] lg:self-start">
                     <div className="space-y-3 rounded-xl border bg-white p-4">
                         <QRCode value={kitUrl} />
                         <Button variant="outline" className="w-full" onClick={() => setEditOpen(true)}>
@@ -362,6 +307,31 @@ export default function KitDetailsPage() {
                             onDownloadXlsx={downloadKitXlsx}
                             isDownloadingXlsx={isExportingKit}
                         />
+                    </div>
+
+                    <div className="space-y-2 rounded-xl border bg-white p-3">
+                        <label htmlFor="kit-item" className="text-sm font-medium">
+                            Add asset
+                        </label>
+                        <div className="flex gap-2">
+                            <select
+                                id="kit-item"
+                                value={selectedItemId}
+                                onChange={(event) => setSelectedItemId(event.target.value)}
+                                className="h-8 min-w-0 flex-1 rounded-full border border-input bg-white px-3 text-sm"
+                            >
+                                <option value="">Choose asset</option>
+                                {availableItems.map((item: Item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <Button size="sm" onClick={addSelectedItem} disabled={addMutation.isPending}>
+                                {addMutation.isPending ? "Adding..." : "Add"}
+                            </Button>
+                        </div>
+                        {error ? <p className="text-sm text-destructive">{error}</p> : null}
                     </div>
 
                     <div className="space-y-4 rounded-xl border bg-white p-4">
@@ -390,6 +360,8 @@ export default function KitDetailsPage() {
                 description="Rename this kit or update its location and notes."
                 name={container.name}
                 details={container.description}
+                locationId={container.location_id ?? ""}
+                locations={locations}
                 isSaving={updateMutation.isPending}
                 error={editError}
                 onOpenChange={setEditOpen}

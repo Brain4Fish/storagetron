@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Location } from "@/lib/api";
+import { LocationSelect } from "@/components/forms/location-select";
 
 type Props = {
     open: boolean;
@@ -20,10 +22,12 @@ type Props = {
     description: string;
     name: string;
     details?: string;
+    locationId?: string;
+    locations?: Location[];
     isSaving?: boolean;
     error?: string;
     onOpenChange: (open: boolean) => void;
-    onSave: (data: { name: string; description: string }) => void;
+    onSave: (data: { name: string; description: string; location_id?: string | null }) => void;
 };
 
 export function EditRecordDialog({
@@ -32,6 +36,8 @@ export function EditRecordDialog({
     description,
     name,
     details = "",
+    locationId = "",
+    locations,
     isSaving,
     error,
     onOpenChange,
@@ -39,15 +45,17 @@ export function EditRecordDialog({
 }: Props) {
     const [draftName, setDraftName] = useState(name);
     const [draftDescription, setDraftDescription] = useState(details);
+    const [draftLocationId, setDraftLocationId] = useState(locationId);
     const [localError, setLocalError] = useState("");
 
     useEffect(() => {
         if (open) {
             setDraftName(name);
             setDraftDescription(details);
+            setDraftLocationId(locationId);
             setLocalError("");
         }
-    }, [details, name, open]);
+    }, [details, locationId, name, open]);
 
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -58,7 +66,11 @@ export function EditRecordDialog({
             return;
         }
 
-        onSave({ name: draftName.trim(), description: draftDescription.trim() });
+        onSave({
+            name: draftName.trim(),
+            description: draftDescription.trim(),
+            ...(locations ? { location_id: draftLocationId || null } : {}),
+        });
     };
 
     return (
@@ -88,6 +100,15 @@ export function EditRecordDialog({
                         />
                     </div>
 
+                    {locations ? (
+                        <LocationSelect
+                            id="edit-location"
+                            locations={locations}
+                            value={draftLocationId}
+                            onChange={setDraftLocationId}
+                        />
+                    ) : null}
+
                     {localError || error ? (
                         <p className="text-sm text-destructive">{localError || error}</p>
                     ) : null}
@@ -105,4 +126,3 @@ export function EditRecordDialog({
         </Dialog>
     );
 }
-

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/Brain4Fish/storagetron/pkg/model"
 
@@ -10,6 +11,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type scanner interface {
+	Scan(dest ...any) error
+}
 
 type ItemRepo struct {
 	db *pgxpool.Pool
@@ -49,9 +54,16 @@ func (r *ItemRepo) Create(ctx context.Context, item model.Item, labelCode string
 
 func (r *ItemRepo) List(ctx context.Context) ([]model.Item, error) {
 	rows, err := r.db.Query(ctx, `
-        SELECT id, name, COALESCE(description, ''), location_id, created_at
-        FROM items
-        ORDER BY created_at DESC
+        SELECT
+            i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at,
+            l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at,
+            il.id, COALESCE(il.name, ''), COALESCE(il.country, ''), COALESCE(il.city, ''), COALESCE(il.room, ''), COALESCE(il.shelf, ''), il.created_at
+        FROM items i
+        LEFT JOIN locations l ON l.id = i.location_id
+        LEFT JOIN item_container ic ON ic.item_id = i.id
+        LEFT JOIN containers c ON c.id = ic.container_id
+        LEFT JOIN locations il ON il.id = c.location_id
+        ORDER BY i.created_at DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -61,7 +73,7 @@ func (r *ItemRepo) List(ctx context.Context) ([]model.Item, error) {
 	res := make([]model.Item, 0)
 	for rows.Next() {
 		var i model.Item
-		if err := rows.Scan(&i.ID, &i.Name, &i.Description, &i.LocationID, &i.CreatedAt); err != nil {
+		if err := scanItemWithLocations(rows, &i); err != nil {
 			return nil, err
 		}
 		res = append(res, i)
@@ -71,9 +83,16 @@ func (r *ItemRepo) List(ctx context.Context) ([]model.Item, error) {
 
 func (r *ItemRepo) ListPage(ctx context.Context, limit, offset int) ([]model.Item, int, error) {
 	rows, err := r.db.Query(ctx, `
-        SELECT id, name, COALESCE(description, ''), location_id, created_at
-        FROM items
-        ORDER BY created_at DESC
+        SELECT
+            i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at,
+            l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at,
+            il.id, COALESCE(il.name, ''), COALESCE(il.country, ''), COALESCE(il.city, ''), COALESCE(il.room, ''), COALESCE(il.shelf, ''), il.created_at
+        FROM items i
+        LEFT JOIN locations l ON l.id = i.location_id
+        LEFT JOIN item_container ic ON ic.item_id = i.id
+        LEFT JOIN containers c ON c.id = ic.container_id
+        LEFT JOIN locations il ON il.id = c.location_id
+        ORDER BY i.created_at DESC
         LIMIT $1 OFFSET $2
     `, limit, offset)
 	if err != nil {
@@ -84,7 +103,7 @@ func (r *ItemRepo) ListPage(ctx context.Context, limit, offset int) ([]model.Ite
 	res := make([]model.Item, 0)
 	for rows.Next() {
 		var i model.Item
-		if err := rows.Scan(&i.ID, &i.Name, &i.Description, &i.LocationID, &i.CreatedAt); err != nil {
+		if err := scanItemWithLocations(rows, &i); err != nil {
 			return nil, 0, err
 		}
 		res = append(res, i)
@@ -103,11 +122,18 @@ func (r *ItemRepo) ListPage(ctx context.Context, limit, offset int) ([]model.Ite
 
 func (r *ItemRepo) Get(ctx context.Context, id uuid.UUID) (model.Item, error) {
 	var i model.Item
-	err := r.db.QueryRow(ctx, `
-		SELECT id, name, COALESCE(description, ''), location_id, created_at
-		FROM items
-		WHERE id = $1
-	`, id).Scan(&i.ID, &i.Name, &i.Description, &i.LocationID, &i.CreatedAt)
+	err := scanItemWithLocations(r.db.QueryRow(ctx, `
+		SELECT
+			i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at,
+			l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at,
+			il.id, COALESCE(il.name, ''), COALESCE(il.country, ''), COALESCE(il.city, ''), COALESCE(il.room, ''), COALESCE(il.shelf, ''), il.created_at
+		FROM items i
+		LEFT JOIN locations l ON l.id = i.location_id
+		LEFT JOIN item_container ic ON ic.item_id = i.id
+		LEFT JOIN containers c ON c.id = ic.container_id
+		LEFT JOIN locations il ON il.id = c.location_id
+		WHERE i.id = $1
+	`, id), &i)
 	return i, err
 }
 
@@ -164,4 +190,35 @@ func (r *ItemRepo) GetLabelByCode(ctx context.Context, code string) (*model.Labe
 		return nil, err
 	}
 	return &label, nil
+}
+
+func scanItemWithLocations(row scanner, item *model.Item) error {
+	var location model.Location
+	var inheritedLocation model.Location
+	var locationID *uuid.UUID
+	var inheritedLocationID *uuid.UUID
+	var locationCreatedAt *time.Time
+	var inheritedLocationCreatedAt *time.Time
+	if err := row.Scan(
+		&item.ID, &item.Name, &item.Description, &item.LocationID, &item.CreatedAt,
+		&locationID, &location.Name, &location.Country, &location.City, &location.Room, &location.Shelf, &locationCreatedAt,
+		&inheritedLocationID, &inheritedLocation.Name, &inheritedLocation.Country, &inheritedLocation.City, &inheritedLocation.Room, &inheritedLocation.Shelf, &inheritedLocationCreatedAt,
+	); err != nil {
+		return err
+	}
+	if locationID != nil {
+		location.ID = *locationID
+		if locationCreatedAt != nil {
+			location.CreatedAt = *locationCreatedAt
+		}
+		item.Location = &location
+	}
+	if inheritedLocationID != nil {
+		inheritedLocation.ID = *inheritedLocationID
+		if inheritedLocationCreatedAt != nil {
+			inheritedLocation.CreatedAt = *inheritedLocationCreatedAt
+		}
+		item.InheritedLocation = &inheritedLocation
+	}
+	return nil
 }

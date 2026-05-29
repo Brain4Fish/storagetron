@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Loader2, X } from "lucide-react";
 import { Item } from "@/lib/api";
+import { effectiveItemLocation, formatLocation, isInheritedItemLocation } from "@/lib/location";
 import { formatDate } from "@/lib/utils";
 
 type Props = {
@@ -54,6 +55,7 @@ export function KitItemsTable({
                             />
                         </th>
                         <th className="p-3 text-left">Item</th>
+                        <th className="p-3 text-left">Location</th>
                         <th className="p-3 text-left">Created</th>
                         <th className="w-12 p-3 text-right"></th>
                     </tr>
@@ -94,6 +96,16 @@ export function KitItemsTable({
                                         ) : null}
                                     </div>
                                 </div>
+                            </td>
+                            <td className="p-3">
+                                {formatLocation(effectiveItemLocation(item)) ? (
+                                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                                        {formatLocation(effectiveItemLocation(item))}
+                                        {isInheritedItemLocation(item) ? " (kit)" : ""}
+                                    </span>
+                                ) : (
+                                    <span className="text-xs text-gray-500">No location</span>
+                                )}
                             </td>
                             <td className="p-3 text-gray-500">{formatDate(item.created_at)}</td>
                             <td className="p-3 text-right">
