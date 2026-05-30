@@ -26,14 +26,25 @@ func MustConnect(ctx context.Context, url string) *pgxpool.Pool {
 		panic(err)
 	}
 
-	ctxPing, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 
-	if err := pool.Ping(ctxPing); err != nil {
-		panic(err)
+	var lastErr error
+	for {
+		ctxPing, cancel := context.WithTimeout(ctx, 5*time.Second)
+		lastErr = pool.Ping(ctxPing)
+		cancel()
+		if lastErr == nil {
+			return pool
+		}
+
+		select {
+		case <-ctx.Done():
+			pool.Close()
+			panic(fmt.Errorf("database connection failed: %w", lastErr))
+		case <-ticker.C:
+		}
 	}
-
-	return pool
 }
 
 func RunMigrations(ctx context.Context, db *pgxpool.Pool) error {

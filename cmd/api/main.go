@@ -25,7 +25,7 @@ func main() {
 
 	cfg := config.MustLoad()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	dbConn := db.MustConnect(ctx, cfg.DatabaseURL)

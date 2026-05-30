@@ -5,6 +5,7 @@ import { Loader2, X } from "lucide-react";
 import { Item } from "@/lib/api";
 import { effectiveItemLocation, formatLocation, isInheritedItemLocation } from "@/lib/location";
 import { formatDate } from "@/lib/utils";
+import { ImagePreview } from "@/components/image-preview";
 
 type Props = {
     items: Item[];
@@ -76,10 +77,10 @@ export function KitItemsTable({
                                 <div className="flex items-center gap-3">
                                     <div className="h-12 w-12 overflow-hidden rounded-lg bg-gray-200">
                                         {item.photos?.[0]?.url ? (
-                                            <img
+                                            <ImagePreview
                                                 src={item.photos[0].url}
-                                                alt=""
-                                                className="h-full w-full object-cover"
+                                                alt={item.name}
+                                                className="rounded-lg"
                                             />
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">

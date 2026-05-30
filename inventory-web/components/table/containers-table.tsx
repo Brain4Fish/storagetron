@@ -6,6 +6,7 @@ import { Container } from "@/lib/api";
 import { formatLocation } from "@/lib/location";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ImagePreview } from "@/components/image-preview";
 
 type ContainersTableProps = {
     containers: Container[];
@@ -80,10 +81,10 @@ export function ContainersTable({
                             <div className="flex items-center gap-2.5">
                                 <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white/70 text-zinc-700 shadow-inner">
                                     {container.photos?.[0]?.url ? (
-                                        <img
+                                        <ImagePreview
                                             src={container.photos[0].url}
-                                            alt=""
-                                            className="h-full w-full object-cover"
+                                            alt={container.name}
+                                            className="rounded-full"
                                         />
                                     ) : (
                                         <Box className="h-5 w-5" />

@@ -5,6 +5,7 @@ import { Item } from "@/lib/api";
 import { effectiveItemLocation, formatLocation, isInheritedItemLocation } from "@/lib/location";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ImagePreview } from "@/components/image-preview";
 
 type ItemsTableProps = {
     items: Item[];
@@ -68,9 +69,10 @@ export function ItemsTable({ items, selectedItemIds, onToggleItem, onToggleItems
                             <td className="flex items-center gap-2.5 p-2.5">
                                 <div className="h-9 w-9 overflow-hidden rounded-full bg-white/70 shadow-inner">
                                     {item.photos?.[0]?.url ? (
-                                        <img
+                                        <ImagePreview
                                             src={item.photos[0].url}
-                                            className="w-full h-full object-cover transition-transform hover:scale-105"
+                                            alt={item.name}
+                                            className="rounded-full"
                                         />
                                     ) : (
 

@@ -5,6 +5,11 @@ services:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
       POSTGRES_DB: app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
     ports:
       - "5432:5432"
 
@@ -39,8 +44,10 @@ services:
         APP_COMMIT: ${APP_COMMIT:-unknown}
         APP_BUILD_DATE: ${APP_BUILD_DATE:-unknown}
     depends_on:
-      - db
-      - minio
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
     environment:
       DATABASE_URL: postgres://app:app@db:5432/app
       S3_ENDPOINT: http://minio:9000
@@ -59,7 +66,8 @@ services:
         WEB_COMMIT: ${WEB_COMMIT:-unknown}
         API_PROXY_TARGET: http://app:8080
     depends_on:
-      - app
+      app:
+        condition: service_started
     environment:
       API_PROXY_TARGET: http://app:8080
     ports:
