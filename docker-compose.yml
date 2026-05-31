@@ -60,7 +60,7 @@ services:
 
   web:
     build:
-      context: ./inventory-web
+      context: frontend
       args:
         WEB_VERSION: ${WEB_VERSION:-dev}
         WEB_COMMIT: ${WEB_COMMIT:-unknown}

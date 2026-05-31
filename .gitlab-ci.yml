@@ -30,6 +30,6 @@ build-frontend:
       --build-arg WEB_COMMIT="$IMAGE_COMMIT"
       -t nexus.lab.spb:5000/storagetron_frontend:latest
       -t nexus.lab.spb:5000/storagetron_frontend:$IMAGE_VERSION
-      inventory-web
+      frontend
     - docker push nexus.lab.spb:5000/storagetron_frontend:latest
     - docker push nexus.lab.spb:5000/storagetron_frontend:$IMAGE_VERSION

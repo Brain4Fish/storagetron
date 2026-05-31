@@ -35,7 +35,7 @@ export function Sidebar({ onHide }: SidebarProps) {
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-white shadow-inner">
                         <PackageOpen className="h-4 w-4" />
                     </span>
-                    <span className="truncate">Shelf</span>
+                    <span className="truncate">Storagetron</span>
                 </Link>
                 <Button
                     variant="ghost"

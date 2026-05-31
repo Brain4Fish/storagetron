@@ -98,9 +98,6 @@ export default function ItemDetailsPage() {
                                 Assets <span className="mx-1">›</span> {data.name}
                             </div>
                             <h1 className="mt-1 text-2xl font-semibold">{data.name}</h1>
-                            <span className="mt-2 inline-block rounded-full bg-green-100 px-2 py-1 text-xs text-green-600">
-                                Available
-                            </span>
                         </div>
                     </div>
 
@@ -108,8 +105,6 @@ export default function ItemDetailsPage() {
                         <span className="border-b-2 border-orange-500 pb-2 text-orange-600">
                             Overview
                         </span>
-                        <span className="pb-2 text-gray-400">Activity</span>
-                        <span className="pb-2 text-gray-400">Bookings</span>
                     </div>
 
                     <div className="rounded-xl border bg-white">
