@@ -6,6 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	backupcore "github.com/Brain4Fish/storagetron/internal/backup"
+	backuphttp "github.com/Brain4Fish/storagetron/internal/backup/httpapi"
+	backupstore "github.com/Brain4Fish/storagetron/internal/backup/store"
+	sftptarget "github.com/Brain4Fish/storagetron/internal/backup/target/sftp"
 	"github.com/Brain4Fish/storagetron/internal/config"
 	"github.com/Brain4Fish/storagetron/internal/db"
 	"github.com/Brain4Fish/storagetron/internal/handler"
@@ -16,6 +20,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -44,11 +50,43 @@ func main() {
 	containerRepo := repository.NewContainerRepo(dbConn)
 	locationRepo := repository.NewLocationRepo(dbConn)
 	photoRepo := repository.NewPhotoRepo(dbConn)
+	backupRepo := backupstore.NewPostgres(dbConn)
 
 	photoSvc := service.NewPhotoService(photoRepo, s3Client)
 	itemSvc := service.NewItemService(itemRepo, photoSvc)
 	containerSvc := service.NewContainerService(containerRepo, photoSvc)
 	locationSvc := service.NewLocationService(locationRepo)
+	backupSecrets, err := backupcore.NewSecretBox(cfg.BackupSecretKey)
+	if err != nil {
+		logger.Fatal("backup secret initialization failed", zap.Error(err))
+	}
+	backupMetrics := backupcore.NewMetrics(prometheus.DefaultRegisterer)
+	backupRegistry := backupcore.NewDriverRegistry(sftptarget.NewFactory())
+	versionInfo := version.Info()
+	backupSvc := backupcore.NewService(backupcore.ServiceConfig{
+		Repository: backupRepo,
+		Targets:    backupRegistry,
+		Secrets:    backupSecrets,
+		Postgres: backupcore.PostgresTools{
+			DatabaseURL: cfg.DatabaseURL,
+			Timeout:     30 * time.Minute,
+		},
+		Objects:    backupcore.NewS3ObjectStorage(s3Client),
+		TempDir:    cfg.BackupTempDir,
+		AppVersion: versionInfo.Version + " (" + versionInfo.Commit + ")",
+		Metrics:    backupMetrics,
+		Logger:     logger,
+	})
+	backupScheduler := backupcore.NewScheduler(backupRepo, logger)
+	backupWorker := backupcore.NewWorker(backupRepo, backupSvc, 10*time.Second, 2*time.Hour, logger)
+	backupHandler := backuphttp.NewHandler(backupRepo, backupSecrets, backupScheduler, logger)
+
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	if err := backupScheduler.Start(workerCtx); err != nil {
+		logger.Fatal("backup scheduler failed to start", zap.Error(err))
+	}
+	go backupWorker.Run(workerCtx)
 
 	itemHandler := handler.NewItemHandler(itemSvc, logger)
 	containerHandler := handler.NewContainerHandler(containerSvc, logger)
@@ -68,6 +106,7 @@ func main() {
 	r.Use(handler.LoggingMiddleware(logger))
 
 	registerAPIRoutes := func(r chi.Router) {
+		r.Handle("/metrics", promhttp.Handler())
 		r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(version.Info())
@@ -102,6 +141,7 @@ func main() {
 		})
 
 		r.Get("/scan/{code}", scanHandler.Scan)
+		r.Route("/backup", backupHandler.Routes)
 	}
 
 	registerAPIRoutes(r)

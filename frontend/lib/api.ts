@@ -78,6 +78,95 @@ export type VersionInfo = {
     date: string;
 };
 
+export type BackupTargetType = "sftp" | "local" | "s3" | "webdav";
+export type BackupJobStatus = "pending" | "running" | "completed" | "failed";
+
+export type BackupTarget = {
+    id: string;
+    name: string;
+    type: BackupTargetType;
+    enabled: boolean;
+    configuration: Record<string, any>;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+};
+
+export type BackupSchedule = {
+    id: string;
+    target_id: string;
+    name: string;
+    cron_expression: string;
+    enabled: boolean;
+    retention_policy: {
+        keep_last_backups: number;
+    };
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+};
+
+export type BackupRun = {
+    id: string;
+    target_id: string;
+    schedule_id?: string;
+    status: BackupJobStatus;
+    phase: string;
+    progress_percent: number;
+    started_at?: string;
+    finished_at?: string;
+    size_bytes?: number;
+    backup_path?: string;
+    error_message?: string;
+    created_at: string;
+    updated_at: string;
+};
+
+export type RestoreRun = {
+    id: string;
+    target_id: string;
+    backup_identifier: string;
+    status: BackupJobStatus;
+    phase: string;
+    progress_percent: number;
+    started_at?: string;
+    finished_at?: string;
+    error_message?: string;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateBackupTargetRequest = {
+    name: string;
+    type: "sftp";
+    enabled: boolean;
+    configuration: {
+        host: string;
+        port: number;
+        username: string;
+        password?: string;
+        private_key?: string;
+        passphrase?: string;
+        host_key?: string;
+        insecure_skip_host_key_check?: boolean;
+        remote_path: string;
+    };
+};
+
+export type CreateBackupScheduleRequest = {
+    target_id: string;
+    name: string;
+    cron_expression: string;
+    enabled: boolean;
+    retention_policy: {
+        keep_last_backups: number;
+    };
+};
+
+export type UpdateBackupTargetRequest = Omit<CreateBackupTargetRequest, "type">;
+
+export type UpdateBackupScheduleRequest = CreateBackupScheduleRequest;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -196,4 +285,27 @@ export const api = {
         request<void>(`/locations/${id}`, { method: "DELETE" }),
     scanCode: (code: string) =>
         request<ScanResult>(`/scan/${encodeURIComponent(normalizeScanCode(code))}`),
+    listBackupTargets: () => request<BackupTarget[]>("/backup/targets"),
+    createBackupTarget: (data: CreateBackupTargetRequest) =>
+        request<BackupTarget>("/backup/targets", { method: "POST", body: JSON.stringify(data) }),
+    updateBackupTarget: (id: string, data: UpdateBackupTargetRequest) =>
+        request<BackupTarget>(`/backup/targets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteBackupTarget: (id: string) =>
+        request<void>(`/backup/targets/${id}`, { method: "DELETE" }),
+    listBackupSchedules: () => request<BackupSchedule[]>("/backup/schedules"),
+    createBackupSchedule: (data: CreateBackupScheduleRequest) =>
+        request<BackupSchedule>("/backup/schedules", { method: "POST", body: JSON.stringify(data) }),
+    updateBackupSchedule: (id: string, data: UpdateBackupScheduleRequest) =>
+        request<BackupSchedule>(`/backup/schedules/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteBackupSchedule: (id: string) =>
+        request<void>(`/backup/schedules/${id}`, { method: "DELETE" }),
+    listBackupRuns: () => request<BackupRun[]>("/backup/runs"),
+    createBackupRun: (targetId: string) =>
+        request<BackupRun>("/backup/run", {
+            method: "POST",
+            body: JSON.stringify({ target_id: targetId }),
+        }),
+    listRestoreRuns: () => request<RestoreRun[]>("/backup/restore-runs"),
+    createRestoreRun: (data: { target_id: string; backup_identifier: string }) =>
+        request<RestoreRun>("/backup/restore", { method: "POST", body: JSON.stringify(data) }),
 };

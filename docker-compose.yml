@@ -55,8 +55,11 @@ services:
       S3_BUCKET: inventory
       S3_ACCESS_KEY: minio
       S3_SECRET_KEY: minio123
+      BACKUP_SECRET_KEY: development-backup-secret-change-me
     ports:
       - "8086:8080"
+    profiles:
+      - app
 
   web:
     build:
@@ -72,3 +75,5 @@ services:
       API_PROXY_TARGET: http://app:8080
     ports:
       - "3000:3000"
+    profiles:
+      - web

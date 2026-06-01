@@ -21,7 +21,7 @@ FROM alpine:3.19 AS runtime
 
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates postgresql-client
 
 COPY --from=builder /app/app .
 COPY migrations ./migrations

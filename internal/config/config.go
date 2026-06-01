@@ -12,6 +12,8 @@ type Config struct {
 	S3Bucket         string
 	S3AccessKey      string
 	S3SecretKey      string
+	BackupSecretKey  string
+	BackupTempDir    string
 }
 
 func MustLoad() Config {
@@ -22,6 +24,8 @@ func MustLoad() Config {
 		S3Bucket:         os.Getenv("S3_BUCKET"),
 		S3AccessKey:      os.Getenv("S3_ACCESS_KEY"),
 		S3SecretKey:      os.Getenv("S3_SECRET_KEY"),
+		BackupSecretKey:  os.Getenv("BACKUP_SECRET_KEY"),
+		BackupTempDir:    os.Getenv("BACKUP_TEMP_DIR"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -41,6 +45,9 @@ func MustLoad() Config {
 	}
 	if cfg.S3SecretKey == "" {
 		log.Fatal("S3_SECRET_KEY required")
+	}
+	if cfg.BackupSecretKey == "" {
+		log.Fatal("BACKUP_SECRET_KEY required")
 	}
 
 	return cfg

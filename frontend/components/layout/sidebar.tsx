@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Box, LayoutDashboard, MapPin, Package, PackageOpen, PanelLeftClose, QrCode } from "lucide-react";
+import { Box, LayoutDashboard, MapPin, Package, PackageOpen, PanelLeftClose, QrCode, Settings } from "lucide-react";
 import { VersionBadge } from "@/components/version-badge";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ const navItems = [
     { href: "/kits", label: "Kits", icon: Box },
     { href: "/locations", label: "Locations", icon: MapPin },
     { href: "/scan", label: "Scan", icon: QrCode },
+    { href: "/settings/backups", label: "Settings", icon: Settings },
 ];
 
 type SidebarProps = {

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/Brain4Fish/storagetron/internal/config"
@@ -94,5 +95,61 @@ func (s *S3) Delete(ctx context.Context, key string) error {
 		Bucket: &s.bucket,
 		Key:    &key,
 	})
+	return err
+}
+
+type ObjectInfo struct {
+	Key          string
+	Size         int64
+	LastModified time.Time
+}
+
+func (s *S3) ListObjects(ctx context.Context) ([]ObjectInfo, error) {
+	paginator := s3.NewListObjectsV2Paginator(s.internalClient, &s3.ListObjectsV2Input{
+		Bucket: &s.bucket,
+	})
+
+	var objects []ObjectInfo
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, object := range page.Contents {
+			if object.Key == nil {
+				continue
+			}
+			objects = append(objects, ObjectInfo{
+				Key:          *object.Key,
+				Size:         aws.ToInt64(object.Size),
+				LastModified: aws.ToTime(object.LastModified),
+			})
+		}
+	}
+	return objects, nil
+}
+
+func (s *S3) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
+	out, err := s.internalClient.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &s.bucket,
+		Key:    &key,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.Body, nil
+}
+
+func (s *S3) PutObject(ctx context.Context, key string, body io.Reader, size int64, contentType string) error {
+	input := &s3.PutObjectInput{
+		Bucket:        &s.bucket,
+		Key:           &key,
+		Body:          body,
+		ContentLength: &size,
+	}
+	if contentType != "" {
+		input.ContentType = aws.String(contentType)
+	}
+	_, err := s.internalClient.PutObject(ctx, input)
 	return err
 }
