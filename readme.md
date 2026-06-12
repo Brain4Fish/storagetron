@@ -67,6 +67,14 @@ If you only need Postgres and MinIO for local development, then use simple
 docker compose up -d
 ```
 
+To run the API with a local Prometheus scraper:
+
+```bash
+docker compose --profile app --profile metrics up --build
+```
+
+Then open Prometheus at <http://localhost:9090>
+
 ## Configuration
 
 The API requires these environment variables:
@@ -244,7 +252,8 @@ docs                     NIIMBOT printing screenshots
 - Postgres is the durable source of truth. Back up the database and object storage together so metadata and photos stay consistent
 - Keep `BACKUP_SECRET_KEY` stable. Rotating it without a migration path will make existing encrypted backup target configuration unreadable
 - Treat Docker Compose credentials as local development defaults only
-- Scrape `/metrics` and alert on failed backup or restore runs if this is used for irreplaceable data
+- Scrape `/metrics` for API, runtime, Postgres pool, backup, and restore metrics
+- Alert on failed backup or restore runs if this is used for irreplaceable data
 
 
 ## Future Improvements

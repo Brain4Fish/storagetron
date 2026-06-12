@@ -13,6 +13,7 @@ import (
 	"github.com/Brain4Fish/storagetron/internal/config"
 	"github.com/Brain4Fish/storagetron/internal/db"
 	"github.com/Brain4Fish/storagetron/internal/handler"
+	appmetrics "github.com/Brain4Fish/storagetron/internal/metrics"
 	"github.com/Brain4Fish/storagetron/internal/repository"
 	"github.com/Brain4Fish/storagetron/internal/service"
 	"github.com/Brain4Fish/storagetron/internal/storage"
@@ -60,9 +61,13 @@ func main() {
 	if err != nil {
 		logger.Fatal("backup secret initialization failed", zap.Error(err))
 	}
-	backupMetrics := backupcore.NewMetrics(prometheus.DefaultRegisterer)
-	backupRegistry := backupcore.NewDriverRegistry(sftptarget.NewFactory())
+	registerer := prometheus.DefaultRegisterer
 	versionInfo := version.Info()
+	httpMetrics := appmetrics.NewHTTPMetrics(registerer)
+	appmetrics.RegisterBuildInfo(registerer, versionInfo.Version, versionInfo.Commit, versionInfo.Date)
+	appmetrics.RegisterPostgresPoolStats(registerer, "main", dbConn)
+	backupMetrics := backupcore.NewMetrics(registerer)
+	backupRegistry := backupcore.NewDriverRegistry(sftptarget.NewFactory())
 	backupSvc := backupcore.NewService(backupcore.ServiceConfig{
 		Repository: backupRepo,
 		Targets:    backupRegistry,
@@ -103,7 +108,7 @@ func main() {
 		MaxAge:         300,
 	}))
 
-	r.Use(handler.LoggingMiddleware(logger))
+	r.Use(handler.ObservabilityMiddleware(logger, httpMetrics))
 
 	registerAPIRoutes := func(r chi.Router) {
 		r.Handle("/metrics", promhttp.Handler())

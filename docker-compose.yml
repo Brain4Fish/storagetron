@@ -77,3 +77,18 @@ services:
       - "3000:3000"
     profiles:
       - web
+
+  prometheus:
+    image: prom/prometheus:v3.12.0
+    depends_on:
+      app:
+        condition: service_started
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    profiles:
+      - metrics
