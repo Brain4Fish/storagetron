@@ -1,4 +1,4 @@
-import { normalizeScanCode } from "@/lib/scan";
+import { normalizeScanCode } from "./scan";
 
 export const API_URL =
     "/api";

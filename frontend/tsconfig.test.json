@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "es2022"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "noEmit": false,
+    "outDir": "/tmp/storagetron-frontend-test-dist",
+    "rootDir": ".",
+    "incremental": false,
+    "types": ["node"]
+  },
+  "include": [
+    "lib/api.ts",
+    "lib/location.ts",
+    "lib/scan.ts",
+    "lib/utils.ts",
+    "tests/**/*.test.ts"
+  ],
+  "exclude": ["node_modules", ".next"]
+}

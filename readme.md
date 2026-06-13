@@ -101,7 +101,7 @@ The API is available both at the root path and under `/api`. With Docker Compose
 ```bash
 curl -X POST http://localhost:8086/locations \
   -H "Content-Type: application/json" \
-  -d '{"country":"Portugal","city":"Lisbon","room":"Living room","shelf":"Shelf A"}'
+  -d '{"country":"Kazakhstan","city":"Almaty","room":"Living room","shelf":"Shelf A"}'
 ```
 
 ### Create an item

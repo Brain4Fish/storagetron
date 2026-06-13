@@ -1,4 +1,4 @@
-import { Location } from "@/lib/api";
+import type { Location } from "./api";
 
 export function formatLocation(location?: Location | null) {
     if (!location) {
