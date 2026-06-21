@@ -74,6 +74,38 @@ func TestItemServiceListReturnsPhotoError(t *testing.T) {
 	require.ErrorContains(t, err, "presign source failed")
 }
 
+func TestItemServiceDeleteRemovesRecordAndPhotoObjects(t *testing.T) {
+	itemID := uuid.New()
+	repo := &fakeItemRepository{}
+	photoRepo := &fakePhotoRepository{itemPhotos: []model.Photo{
+		{ID: uuid.New(), ObjectKey: "items/camera/front.jpg"},
+		{ID: uuid.New(), ObjectKey: "items/camera/back.jpg"},
+	}}
+	storage := &fakePresignStorage{}
+	svc := NewItemService(repo, NewPhotoService(photoRepo, storage))
+
+	err := svc.Delete(context.Background(), itemID)
+
+	require.NoError(t, err)
+	require.Equal(t, itemID, photoRepo.listItemID)
+	require.Equal(t, itemID, repo.deleteID)
+	require.Equal(t, []string{"items/camera/front.jpg", "items/camera/back.jpg"}, storage.deletedKeys)
+}
+
+func TestItemServiceDeleteDoesNotRemovePhotoObjectsWhenRecordDeleteFails(t *testing.T) {
+	itemID := uuid.New()
+	repo := &fakeItemRepository{deleteErr: pgx.ErrNoRows}
+	photoRepo := &fakePhotoRepository{itemPhotos: []model.Photo{{ID: uuid.New(), ObjectKey: "items/missing.jpg"}}}
+	storage := &fakePresignStorage{}
+	svc := NewItemService(repo, NewPhotoService(photoRepo, storage))
+
+	err := svc.Delete(context.Background(), itemID)
+
+	require.ErrorIs(t, err, pgx.ErrNoRows)
+	require.Equal(t, itemID, repo.deleteID)
+	require.Empty(t, storage.deletedKeys)
+}
+
 func TestContainerServiceListReturnsContainersWhenPhotoServiceIsNil(t *testing.T) {
 	containerID := uuid.New()
 	repo := &fakeContainerRepository{containers: []model.Container{{ID: containerID, Name: "Box 07"}}}
@@ -100,6 +132,24 @@ func TestContainerServiceGetAttachesPhotos(t *testing.T) {
 	require.Equal(t, "https://storage/box", container.Photos[0].URL)
 }
 
+func TestContainerServiceDeleteRemovesKitAndPhotoObjects(t *testing.T) {
+	containerID := uuid.New()
+	repo := &fakeContainerRepository{}
+	photoRepo := &fakePhotoRepository{containerPhotos: []model.Photo{
+		{ID: uuid.New(), ObjectKey: "containers/box/front.jpg"},
+		{ID: uuid.New(), ObjectKey: "containers/box/label.jpg"},
+	}}
+	storage := &fakePresignStorage{}
+	svc := NewContainerService(repo, NewPhotoService(photoRepo, storage))
+
+	err := svc.Delete(context.Background(), containerID)
+
+	require.NoError(t, err)
+	require.Equal(t, containerID, photoRepo.listContainerID)
+	require.Equal(t, containerID, repo.deleteID)
+	require.Equal(t, []string{"containers/box/front.jpg", "containers/box/label.jpg"}, storage.deletedKeys)
+}
+
 type fakeItemRepository struct {
 	created          model.Item
 	createdLabelCode string
@@ -116,6 +166,9 @@ type fakeItemRepository struct {
 	item   model.Item
 	getID  uuid.UUID
 	getErr error
+
+	deleteID  uuid.UUID
+	deleteErr error
 }
 
 func (r *fakeItemRepository) Create(_ context.Context, item model.Item, labelCode string) error {
@@ -149,8 +202,9 @@ func (r *fakeItemRepository) Update(context.Context, uuid.UUID, model.UpdateItem
 	return nil
 }
 
-func (r *fakeItemRepository) Delete(context.Context, uuid.UUID) error {
-	return nil
+func (r *fakeItemRepository) Delete(_ context.Context, id uuid.UUID) error {
+	r.deleteID = id
+	return r.deleteErr
 }
 
 func (r *fakeItemRepository) GetByLabelCode(context.Context, string) (model.Item, error) {
@@ -165,6 +219,8 @@ type fakeContainerRepository struct {
 	containers []model.Container
 	container  model.Container
 	getID      uuid.UUID
+	deleteID   uuid.UUID
+	deleteErr  error
 }
 
 func (r *fakeContainerRepository) Create(context.Context, model.Container, string) error {
@@ -182,6 +238,11 @@ func (r *fakeContainerRepository) Get(_ context.Context, id uuid.UUID) (model.Co
 
 func (r *fakeContainerRepository) Update(context.Context, uuid.UUID, model.UpdateContainerRequest) error {
 	return nil
+}
+
+func (r *fakeContainerRepository) Delete(_ context.Context, id uuid.UUID) error {
+	r.deleteID = id
+	return r.deleteErr
 }
 
 func (r *fakeContainerRepository) AddItem(context.Context, uuid.UUID, uuid.UUID) error {

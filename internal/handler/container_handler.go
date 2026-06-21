@@ -128,6 +128,29 @@ func (h *ContainerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(container)
 }
 
+func (h *ContainerHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondErr(w, http.StatusBadRequest, "invalid container id")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.svc.Delete(ctx, id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondErr(w, http.StatusNotFound, "container not found")
+			return
+		}
+		h.logger.Error("delete container failed", zap.Error(err), zap.String("container_id", id.String()))
+		respondErr(w, http.StatusInternalServerError, "failed to delete container")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *ContainerHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 	containerID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {

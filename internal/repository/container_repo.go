@@ -119,6 +119,17 @@ func (r *ContainerRepo) Update(ctx context.Context, id uuid.UUID, req model.Upda
 	return nil
 }
 
+func (r *ContainerRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	cmd, err := r.db.Exec(ctx, `DELETE FROM containers WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 func (r *ContainerRepo) AddItem(ctx context.Context, containerID, itemID uuid.UUID) error {
 	cmd, err := r.db.Exec(ctx, `
 		INSERT INTO item_container (item_id, container_id)

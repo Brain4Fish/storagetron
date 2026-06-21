@@ -1,20 +1,32 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { Download, Trash2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, Container } from "@/lib/api";
 import { downloadSelectedKitsXlsx } from "@/lib/export-assets";
 import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { CreateContainerDialog } from "@/components/forms/create-container-dialog";
 import { ContainersTable } from "@/components/table/containers-table";
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
+
+type DeleteRequest = {
+    ids: string[];
+    title: string;
+    subject: string;
+};
 
 export default function KitsPage() {
+    const queryClient = useQueryClient();
     const [open, setOpen] = useState(false);
     const [selectedContainerIds, setSelectedContainerIds] = useState<Set<string>>(() => new Set());
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState("");
+    const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
+    const [actionError, setActionError] = useState("");
     const { data, isLoading } = useQuery({
         queryKey: ["containers"],
         queryFn: api.listContainers,
@@ -55,6 +67,7 @@ export default function KitsPage() {
 
     const clearSelection = () => {
         setExportError("");
+        setActionError("");
         setSelectedContainerIds(new Set());
     };
 
@@ -68,6 +81,69 @@ export default function KitsPage() {
             setExportError(err instanceof Error ? err.message : "Failed to export selected kits.");
         } finally {
             setIsExporting(false);
+        }
+    };
+
+    const openDeleteKits = (ids: string[], subject: string) => {
+        setDeleteError("");
+        setActionError("");
+        setDeleteRequest({
+            ids,
+            subject,
+            title: ids.length === 1 ? "Delete kit" : "Delete kits",
+        });
+    };
+
+    const openDeleteKit = (container: Container) => {
+        openDeleteKits([container.id], container.name);
+    };
+
+    const openDeleteSelected = () => {
+        const ids = Array.from(selectedContainerIds);
+        if (ids.length === 0) return;
+        openDeleteKits(ids, `${ids.length} selected kit${ids.length === 1 ? "" : "s"}`);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteRequest) return;
+
+        setIsDeleting(true);
+        setDeleteError("");
+        setActionError("");
+
+        const ids = deleteRequest.ids;
+        const results = await Promise.allSettled(ids.map((containerId) => api.deleteContainer(containerId)));
+        const deletedIds = ids.filter((_, index) => results[index].status === "fulfilled");
+        const failedCount = ids.length - deletedIds.length;
+
+        if (deletedIds.length > 0) {
+            setSelectedContainerIds((current) => {
+                const next = new Set(current);
+                deletedIds.forEach((containerId) => next.delete(containerId));
+                return next;
+            });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["containers"] }),
+                queryClient.invalidateQueries({ queryKey: ["items"] }),
+            ]);
+        }
+
+        setIsDeleting(false);
+
+        if (failedCount === 0) {
+            setDeleteRequest(null);
+            return;
+        }
+
+        const message = deletedIds.length > 0
+            ? `Deleted ${deletedIds.length} of ${ids.length}. ${failedCount} failed.`
+            : `Could not delete ${ids.length === 1 ? "this kit" : "these kits"}.`;
+
+        if (deletedIds.length > 0) {
+            setDeleteRequest(null);
+            setActionError(message);
+        } else {
+            setDeleteError(message);
         }
     };
 
@@ -95,11 +171,17 @@ export default function KitsPage() {
                                 <Download className="h-4 w-4" />
                                 {isExporting ? "Preparing..." : "Download XLSX"}
                             </Button>
+                            <Button variant="destructive" onClick={openDeleteSelected} disabled={isDeleting}>
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                            </Button>
                             <Button variant="outline" onClick={clearSelection}>
                                 Clear selection
                             </Button>
                         </div>
-                        {exportError ? <p className="text-sm text-destructive sm:basis-full">{exportError}</p> : null}
+                        {exportError || actionError ? (
+                            <p className="text-sm text-destructive sm:basis-full">{exportError || actionError}</p>
+                        ) : null}
                     </div>
                 ) : null}
 
@@ -111,11 +193,24 @@ export default function KitsPage() {
                         selectedContainerIds={selectedContainerIds}
                         onToggleContainer={toggleContainer}
                         onToggleContainers={toggleContainers}
+                        onDeleteContainer={openDeleteKit}
                     />
                 )}
             </div>
 
             <CreateContainerDialog open={open} onOpenChange={setOpen} />
+            <DeleteConfirmationDialog
+                open={deleteRequest !== null}
+                title={deleteRequest?.title ?? "Delete kits"}
+                isDeleting={isDeleting}
+                error={deleteError}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen && !isDeleting) setDeleteRequest(null);
+                }}
+                onConfirm={confirmDelete}
+            >
+                This permanently deletes <span className="font-semibold text-zinc-950">{deleteRequest?.subject}</span>. Assets inside deleted kits stay in inventory.
+            </DeleteConfirmationDialog>
         </PageShell>
     );
 }

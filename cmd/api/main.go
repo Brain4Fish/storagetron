@@ -132,6 +132,7 @@ func main() {
 			r.Get("/", containerHandler.List)
 			r.Get("/{id}", containerHandler.Get)
 			r.Patch("/{id}", containerHandler.Update)
+			r.Delete("/{id}", containerHandler.Delete)
 			r.Post("/{id}/items", containerHandler.AddItem)
 			r.Delete("/{id}/items/{item_id}", containerHandler.RemoveItem)
 			r.Post("/{id}/photos", photoHandler.UploadContainer)

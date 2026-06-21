@@ -170,6 +170,18 @@ curl -X POST http://localhost:8086/containers/{container_id}/items \
   -d '{"item_id":"{item_id}"}'
 ```
 
+Delete an item:
+
+```bash
+curl -X DELETE http://localhost:8086/items/{item_id}
+```
+
+Delete a kit/container while keeping its items in inventory:
+
+```bash
+curl -X DELETE http://localhost:8086/containers/{container_id}
+```
+
 Create a photo upload URL:
 
 ```bash

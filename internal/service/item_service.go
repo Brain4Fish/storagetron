@@ -106,7 +106,23 @@ func (s *ItemService) Update(ctx context.Context, id uuid.UUID, req model.Update
 }
 
 func (s *ItemService) Delete(ctx context.Context, id uuid.UUID) error {
-	return s.repo.Delete(ctx, id)
+	var photoObjectKeys []string
+	if s.photoSvc != nil {
+		keys, err := s.photoSvc.ListObjectKeysByItemID(ctx, id)
+		if err != nil {
+			return err
+		}
+		photoObjectKeys = keys
+	}
+
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	if s.photoSvc != nil {
+		return s.photoSvc.DeleteObjectKeys(ctx, photoObjectKeys)
+	}
+	return nil
 }
 
 func (s *ItemService) GetByCode(ctx context.Context, code string) (model.Item, error) {

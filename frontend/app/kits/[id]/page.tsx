@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { Box, Download } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { Box, Download, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, Item } from "@/lib/api";
 import { downloadInventoryRowsXlsx, downloadSelectedAssetsXlsx } from "@/lib/export-assets";
@@ -16,9 +16,11 @@ import { UploadPhotoForm } from "@/components/forms/upload-photo-form";
 import { Button } from "@/components/ui/button";
 import { PrintLabelDialog } from "@/components/print-label-dialog";
 import { EditRecordDialog } from "@/components/forms/edit-record-dialog";
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 
 export default function KitDetailsPage() {
     const params = useParams();
+    const router = useRouter();
     const queryClient = useQueryClient();
     const id = params.id as string;
     const [selectedItemId, setSelectedItemId] = useState("");
@@ -31,6 +33,11 @@ export default function KitDetailsPage() {
     const [isExportingKit, setIsExportingKit] = useState(false);
     const [exportError, setExportError] = useState("");
     const [deletingPhotoId, setDeletingPhotoId] = useState("");
+    const [deleteKitOpen, setDeleteKitOpen] = useState(false);
+    const [deleteAssetsOpen, setDeleteAssetsOpen] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
+    const [isDeletingAssets, setIsDeletingAssets] = useState(false);
+    const [actionError, setActionError] = useState("");
 
     const containerQuery = useQuery({
         queryKey: ["container", id],
@@ -131,6 +138,22 @@ export default function KitDetailsPage() {
         onSettled: () => setDeletingPhotoId(""),
     });
 
+    const deleteKitMutation = useMutation({
+        mutationFn: () => api.deleteContainer(id),
+        onSuccess: async () => {
+            setDeleteError("");
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["container", id] }),
+                queryClient.invalidateQueries({ queryKey: ["containers"] }),
+                queryClient.invalidateQueries({ queryKey: ["items"] }),
+            ]);
+            router.push("/kits");
+        },
+        onError: (err) => {
+            setDeleteError(err instanceof ApiError ? err.message : "Failed to delete kit");
+        },
+    });
+
     const addSelectedItem = () => {
         if (!selectedItemId) {
             setError("Choose an item to add");
@@ -168,6 +191,7 @@ export default function KitDetailsPage() {
 
     const clearSelection = () => {
         setExportError("");
+        setActionError("");
         setSelectedItemIds(new Set());
     };
 
@@ -209,6 +233,56 @@ export default function KitDetailsPage() {
             setExportError(err instanceof Error ? err.message : "Failed to export kit.");
         } finally {
             setIsExportingKit(false);
+        }
+    };
+
+    const openDeleteSelectedAssets = () => {
+        setDeleteError("");
+        setActionError("");
+        setDeleteAssetsOpen(true);
+    };
+
+    const confirmDeleteSelectedAssets = async () => {
+        const ids = Array.from(selectedItemIds);
+        if (ids.length === 0) return;
+
+        setIsDeletingAssets(true);
+        setDeleteError("");
+        setActionError("");
+
+        const results = await Promise.allSettled(ids.map((itemId) => api.deleteItem(itemId)));
+        const deletedIds = ids.filter((_, index) => results[index].status === "fulfilled");
+        const failedCount = ids.length - deletedIds.length;
+
+        if (deletedIds.length > 0) {
+            setSelectedItemIds((current) => {
+                const next = new Set(current);
+                deletedIds.forEach((itemId) => next.delete(itemId));
+                return next;
+            });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["container", id] }),
+                queryClient.invalidateQueries({ queryKey: ["containers"] }),
+                queryClient.invalidateQueries({ queryKey: ["items"] }),
+            ]);
+        }
+
+        setIsDeletingAssets(false);
+
+        if (failedCount === 0) {
+            setDeleteAssetsOpen(false);
+            return;
+        }
+
+        const message = deletedIds.length > 0
+            ? `Deleted ${deletedIds.length} of ${ids.length}. ${failedCount} failed.`
+            : `Could not delete ${ids.length === 1 ? "this asset" : "these assets"}.`;
+
+        if (deletedIds.length > 0) {
+            setDeleteAssetsOpen(false);
+            setActionError(message);
+        } else {
+            setDeleteError(message);
         }
     };
 
@@ -274,11 +348,17 @@ export default function KitDetailsPage() {
                                         <Download className="h-4 w-4" />
                                         {isExporting ? "Preparing..." : "Download XLSX"}
                                     </Button>
+                                    <Button variant="destructive" onClick={openDeleteSelectedAssets} disabled={isDeletingAssets}>
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete
+                                    </Button>
                                     <Button variant="outline" onClick={clearSelection}>
                                         Clear selection
                                     </Button>
                                 </div>
-                                {exportError ? <p className="text-sm text-destructive sm:basis-full">{exportError}</p> : null}
+                                {exportError || actionError ? (
+                                    <p className="text-sm text-destructive sm:basis-full">{exportError || actionError}</p>
+                                ) : null}
                             </div>
                         ) : null}
 
@@ -307,6 +387,17 @@ export default function KitDetailsPage() {
                             onDownloadXlsx={downloadKitXlsx}
                             isDownloadingXlsx={isExportingKit}
                         />
+                        <Button
+                            variant="destructive"
+                            className="w-full"
+                            onClick={() => {
+                                setDeleteError("");
+                                setDeleteKitOpen(true);
+                            }}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Delete kit
+                        </Button>
                     </div>
 
                     <div className="space-y-2 rounded-xl border bg-white p-3">
@@ -367,6 +458,30 @@ export default function KitDetailsPage() {
                 onOpenChange={setEditOpen}
                 onSave={(payload) => updateMutation.mutate(payload)}
             />
+            <DeleteConfirmationDialog
+                open={deleteKitOpen}
+                title="Delete kit"
+                isDeleting={deleteKitMutation.isPending}
+                error={deleteError}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen && !deleteKitMutation.isPending) setDeleteKitOpen(false);
+                }}
+                onConfirm={() => deleteKitMutation.mutate()}
+            >
+                This permanently deletes <span className="font-semibold text-zinc-950">{container.name}</span>. Assets inside this kit stay in inventory.
+            </DeleteConfirmationDialog>
+            <DeleteConfirmationDialog
+                open={deleteAssetsOpen}
+                title="Delete selected assets"
+                isDeleting={isDeletingAssets}
+                error={deleteError}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen && !isDeletingAssets) setDeleteAssetsOpen(false);
+                }}
+                onConfirm={confirmDeleteSelectedAssets}
+            >
+                This permanently deletes <span className="font-semibold text-zinc-950">{selectedCount} selected asset{selectedCount === 1 ? "" : "s"}</span>, including photos and labels.
+            </DeleteConfirmationDialog>
         </PageShell>
     );
 }

@@ -189,6 +189,10 @@ func (r *scanContainerRepo) Update(context.Context, uuid.UUID, model.UpdateConta
 	return nil
 }
 
+func (r *scanContainerRepo) Delete(context.Context, uuid.UUID) error {
+	return nil
+}
+
 func (r *scanContainerRepo) AddItem(context.Context, uuid.UUID, uuid.UUID) error {
 	return nil
 }

@@ -13,6 +13,7 @@ type ContainerRepository interface {
 	List(context.Context) ([]model.Container, error)
 	Get(context.Context, uuid.UUID) (model.Container, error)
 	Update(context.Context, uuid.UUID, model.UpdateContainerRequest) error
+	Delete(context.Context, uuid.UUID) error
 	AddItem(context.Context, uuid.UUID, uuid.UUID) error
 	RemoveItem(context.Context, uuid.UUID, uuid.UUID) error
 	GetByLabelCode(context.Context, string) (model.Container, error)
@@ -87,6 +88,26 @@ func (s *ContainerService) Update(ctx context.Context, id uuid.UUID, req model.U
 		return model.Container{}, err
 	}
 	return s.repo.Get(ctx, id)
+}
+
+func (s *ContainerService) Delete(ctx context.Context, id uuid.UUID) error {
+	var photoObjectKeys []string
+	if s.photoSvc != nil {
+		keys, err := s.photoSvc.ListObjectKeysByContainerID(ctx, id)
+		if err != nil {
+			return err
+		}
+		photoObjectKeys = keys
+	}
+
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	if s.photoSvc != nil {
+		return s.photoSvc.DeleteObjectKeys(ctx, photoObjectKeys)
+	}
+	return nil
 }
 
 func (s *ContainerService) AddItem(ctx context.Context, containerID, itemID uuid.UUID) error {

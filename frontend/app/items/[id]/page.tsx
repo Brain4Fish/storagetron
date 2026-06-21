@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Package } from "lucide-react";
+import { Download, Package, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { downloadSelectedAssetsXlsx } from "@/lib/export-assets";
 import { PageShell } from "@/components/page-shell";
@@ -15,9 +15,11 @@ import { QRCode } from "@/components/qr/qr-code";
 import { PrintLabelDialog } from "@/components/print-label-dialog";
 import { EditRecordDialog } from "@/components/forms/edit-record-dialog";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 
 export default function ItemDetailsPage() {
     const params = useParams();
+    const router = useRouter();
     const queryClient = useQueryClient();
     const id = params.id as string;
     const [editOpen, setEditOpen] = useState(false);
@@ -25,6 +27,8 @@ export default function ItemDetailsPage() {
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState("");
     const [deletingPhotoId, setDeletingPhotoId] = useState("");
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
 
     const { data, isLoading } = useQuery({
         queryKey: ["item", id],
@@ -58,6 +62,21 @@ export default function ItemDetailsPage() {
             await queryClient.invalidateQueries({ queryKey: ["item", id] });
         },
         onSettled: () => setDeletingPhotoId(""),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: () => api.deleteItem(id),
+        onSuccess: async () => {
+            setDeleteError("");
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["items"] }),
+                queryClient.invalidateQueries({ queryKey: ["containers"] }),
+            ]);
+            router.push("/items");
+        },
+        onError: (err) => {
+            setDeleteError(err instanceof ApiError ? err.message : "Failed to delete asset");
+        },
     });
 
     if (isLoading) return <PageShell>Loading...</PageShell>;
@@ -149,6 +168,17 @@ export default function ItemDetailsPage() {
                             <Download className="h-4 w-4" />
                             {isExporting ? "Preparing..." : "Download XLSX"}
                         </Button>
+                        <Button
+                            variant="destructive"
+                            className="w-full"
+                            onClick={() => {
+                                setDeleteError("");
+                                setDeleteOpen(true);
+                            }}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Delete asset
+                        </Button>
                         {exportError ? <p className="text-sm text-destructive">{exportError}</p> : null}
                         <button
                             onClick={() => window.print()}
@@ -191,6 +221,18 @@ export default function ItemDetailsPage() {
                 onOpenChange={setEditOpen}
                 onSave={(payload) => updateMutation.mutate(payload)}
             />
+            <DeleteConfirmationDialog
+                open={deleteOpen}
+                title="Delete asset"
+                isDeleting={deleteMutation.isPending}
+                error={deleteError}
+                onOpenChange={(nextOpen) => {
+                    if (!nextOpen && !deleteMutation.isPending) setDeleteOpen(false);
+                }}
+                onConfirm={() => deleteMutation.mutate()}
+            >
+                This permanently deletes <span className="font-semibold text-zinc-950">{data.name}</span>, including photos and labels.
+            </DeleteConfirmationDialog>
         </PageShell>
     );
 }

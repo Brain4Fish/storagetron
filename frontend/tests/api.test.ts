@@ -18,11 +18,21 @@ test("api.scanCode normalizes URLs and encodes extracted scan code", async () =>
 });
 
 test("api methods return undefined for 204 responses", async () => {
-    global.fetch = async () => new Response(null, { status: 204 });
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ input, init });
+        return new Response(null, { status: 204 });
+    };
 
     await assert.doesNotReject(async () => {
         assert.equal(await api.deleteItem("item-1"), undefined);
+        assert.equal(await api.deleteContainer("kit-1"), undefined);
     });
+
+    assert.equal(calls[0].input, "/api/items/item-1");
+    assert.equal(calls[0].init?.method, "DELETE");
+    assert.equal(calls[1].input, "/api/containers/kit-1");
+    assert.equal(calls[1].init?.method, "DELETE");
 });
 
 test("api methods surface JSON error messages with status code", async () => {

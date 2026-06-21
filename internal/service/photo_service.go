@@ -131,6 +131,41 @@ func (s *PhotoService) ListByContainerID(ctx context.Context, containerID uuid.U
 	return photos, nil
 }
 
+func (s *PhotoService) ListObjectKeysByItemID(ctx context.Context, itemID uuid.UUID) ([]string, error) {
+	photos, err := s.repo.ListByItemID(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := make([]string, 0, len(photos))
+	for _, photo := range photos {
+		keys = append(keys, photo.ObjectKey)
+	}
+	return keys, nil
+}
+
+func (s *PhotoService) ListObjectKeysByContainerID(ctx context.Context, containerID uuid.UUID) ([]string, error) {
+	photos, err := s.repo.ListByContainerID(ctx, containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := make([]string, 0, len(photos))
+	for _, photo := range photos {
+		keys = append(keys, photo.ObjectKey)
+	}
+	return keys, nil
+}
+
+func (s *PhotoService) DeleteObjectKeys(ctx context.Context, keys []string) error {
+	for _, key := range keys {
+		if err := s.storage.Delete(ctx, key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *PhotoService) DeleteContainerPhoto(ctx context.Context, containerID, photoID uuid.UUID) error {
 	photo, err := s.repo.DeleteByContainerID(ctx, containerID, photoID)
 	if err != nil {

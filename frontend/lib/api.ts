@@ -255,6 +255,8 @@ export const api = {
         request<Container>("/containers", { method: "POST", body: JSON.stringify(data) }),
     updateContainer: (id: string, data: any) =>
         request<Container>(`/containers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteContainer: (id: string) =>
+        request<void>(`/containers/${id}`, { method: "DELETE" }),
     addItemToContainer: (containerId: string, itemId: string) =>
         request<void>(`/containers/${containerId}/items`, {
             method: "POST",

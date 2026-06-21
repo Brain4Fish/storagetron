@@ -124,6 +124,39 @@ func TestContainerHandlerRemoveItemMapsMissingRelationToNotFound(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "relation not found")
 }
 
+func TestContainerHandlerDeleteReturnsNoContent(t *testing.T) {
+	containerID := uuid.New()
+	repo := &inventoryContainerRepo{}
+	handler := NewContainerHandler(service.NewContainerService(repo, nil), zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	handler.Delete(rec, inventoryRequestWithParams(http.MethodDelete, "/containers/"+containerID.String(), "", map[string]string{"id": containerID.String()}))
+
+	require.Equal(t, http.StatusNoContent, rec.Code)
+	require.Equal(t, containerID, repo.deletedID)
+}
+
+func TestContainerHandlerDeleteRejectsInvalidID(t *testing.T) {
+	handler := NewContainerHandler(service.NewContainerService(&inventoryContainerRepo{}, nil), zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	handler.Delete(rec, inventoryRequestWithParams(http.MethodDelete, "/containers/not-a-uuid", "", map[string]string{"id": "not-a-uuid"}))
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "invalid container id")
+}
+
+func TestContainerHandlerDeleteMapsNotFound(t *testing.T) {
+	containerID := uuid.New()
+	handler := NewContainerHandler(service.NewContainerService(&inventoryContainerRepo{deleteErr: pgx.ErrNoRows}, nil), zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	handler.Delete(rec, inventoryRequestWithParams(http.MethodDelete, "/containers/"+containerID.String(), "", map[string]string{"id": containerID.String()}))
+
+	require.Equal(t, http.StatusNotFound, rec.Code)
+	require.Contains(t, rec.Body.String(), "container not found")
+}
+
 func TestLocationHandlerCreateRejectsEmptyLocation(t *testing.T) {
 	handler := NewLocationHandler(service.NewLocationService(&inventoryLocationRepo{}), zap.NewNop())
 
@@ -297,6 +330,9 @@ type inventoryContainerRepo struct {
 	addItemID      uuid.UUID
 	addErr         error
 
+	deletedID uuid.UUID
+	deleteErr error
+
 	removeErr error
 }
 
@@ -314,6 +350,11 @@ func (r *inventoryContainerRepo) Get(context.Context, uuid.UUID) (model.Containe
 
 func (r *inventoryContainerRepo) Update(context.Context, uuid.UUID, model.UpdateContainerRequest) error {
 	return nil
+}
+
+func (r *inventoryContainerRepo) Delete(_ context.Context, id uuid.UUID) error {
+	r.deletedID = id
+	return r.deleteErr
 }
 
 func (r *inventoryContainerRepo) AddItem(_ context.Context, containerID, itemID uuid.UUID) error {

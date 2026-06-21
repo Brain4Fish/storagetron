@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Package, X } from "lucide-react";
 import { Item } from "@/lib/api";
 import { effectiveItemLocation, formatLocation, isInheritedItemLocation } from "@/lib/location";
 import { formatDate } from "@/lib/utils";
@@ -38,7 +38,87 @@ export function KitItemsTable({
     const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
 
     return (
-        <div className="overflow-hidden rounded-xl border bg-white">
+        <>
+        <div className="space-y-3 md:hidden">
+            <label className="flex items-center gap-3 rounded-xl border bg-white px-4 py-3 text-sm text-muted-foreground">
+                <input
+                    type="checkbox"
+                    aria-label="Select all visible kit assets"
+                    checked={allVisibleSelected}
+                    ref={(input) => {
+                        if (input) input.indeterminate = someVisibleSelected;
+                    }}
+                    onChange={(event) => onToggleItems(visibleItemIds, event.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 accent-orange-600"
+                />
+                <span>{allVisibleSelected ? "All visible kit assets selected" : "Select visible kit assets"}</span>
+            </label>
+
+            {items.map((item) => (
+                <article key={item.id} className="rounded-xl border bg-white p-3 shadow-soft">
+                    <div className="flex gap-3">
+                        <input
+                            type="checkbox"
+                            aria-label={`Select ${item.name}`}
+                            checked={selectedItemIds.has(item.id)}
+                            onChange={() => onToggleItem(item.id)}
+                            className="mt-2 h-4 w-4 shrink-0 rounded border-gray-300 accent-orange-600"
+                        />
+                        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100 text-muted-foreground">
+                            {item.photos?.[0]?.url ? (
+                                <ImagePreview
+                                    src={item.photos[0].url}
+                                    alt={item.name}
+                                    className="rounded-xl"
+                                />
+                            ) : (
+                                <Package className="h-7 w-7" />
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                                <Link href={`/items/${item.id}`} className="line-clamp-2 font-semibold text-zinc-950">
+                                    {item.name}
+                                </Link>
+                                {onRemove ? (
+                                    <button
+                                        type="button"
+                                        aria-label={`Remove ${item.name} from kit`}
+                                        disabled={removingItemId === item.id}
+                                        onClick={() => onRemove(item.id)}
+                                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70"
+                                    >
+                                        {removingItemId === item.id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <X className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                ) : null}
+                            </div>
+                            {item.description ? (
+                                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{item.description}</p>
+                            ) : null}
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                {formatLocation(effectiveItemLocation(item)) ? (
+                                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                                        {formatLocation(effectiveItemLocation(item))}
+                                        {isInheritedItemLocation(item) ? " (kit)" : ""}
+                                    </span>
+                                ) : (
+                                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500">No location</span>
+                                )}
+                            </div>
+                            <div className="mt-2 text-xs text-muted-foreground">
+                                Added {formatDate(item.created_at)}
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            ))}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-xl border bg-white md:block">
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[620px] text-sm">
                     <thead className="bg-gray-50 text-gray-500">
@@ -83,8 +163,8 @@ export function KitItemsTable({
                                                 className="rounded-lg"
                                             />
                                         ) : (
-                                            <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
-                                                No image
+                                            <div className="flex h-full w-full items-center justify-center text-gray-400">
+                                                <Package className="h-5 w-5" />
                                             </div>
                                         )}
                                     </div>
@@ -132,5 +212,6 @@ export function KitItemsTable({
                 </table>
             </div>
         </div>
+        </>
     );
 }
