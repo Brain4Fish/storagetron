@@ -27,9 +27,9 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "storagetron.fullname" $ }}-{{ .service }}
+                name: {{ include "storagetron.ingressServiceName" (dict "root" $ "path" .) }}
                 port:
-                  number: {{ .port }}
+                  number: {{ include "storagetron.ingressServicePort" (dict "root" $ "path" .) }}
           {{- end }}
     {{- end }}
 {{- end }}

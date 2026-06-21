@@ -7,43 +7,87 @@ metadata:
     {{- include "storagetron.labels" . | nindent 4 }}
     app.kubernetes.io/component: minio-setup
   annotations:
-    # "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
-  backoffLimit: 6
+  backoffLimit: {{ .Values.minio.setup.backoffLimit }}
   template:
     metadata:
       labels:
         {{- include "storagetron.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: minio-setup
+        {{- with .Values.minio.setup.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.minio.setup.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       restartPolicy: OnFailure
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.minio.setup.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: minio-setup
           image: "{{ .Values.minio.mcImage.repository }}:{{ .Values.minio.mcImage.tag }}"
           imagePullPolicy: {{ .Values.minio.mcImage.pullPolicy }}
+          {{- with .Values.minio.setup.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: MINIO_ENDPOINT
               value: {{ include "storagetron.s3Endpoint" . | quote }}
             - name: MINIO_ROOT_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "storagetron.fullname" . }}
-                  key: MINIO_ROOT_USER
+                  name: {{ include "storagetron.secretName" . }}
+                  key: {{ .Values.secret.keys.minioRootUser }}
             - name: MINIO_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "storagetron.fullname" . }}
-                  key: MINIO_ROOT_PASSWORD
+                  name: {{ include "storagetron.secretName" . }}
+                  key: {{ .Values.secret.keys.minioRootPassword }}
             - name: MINIO_BUCKET
               value: {{ include "storagetron.s3Bucket" . | quote }}
+            - name: MINIO_CORS_ALLOWED_ORIGINS
+              value: {{ join "," .Values.minio.setup.corsAllowedOrigins | quote }}
+            {{- with .Values.minio.setup.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.minio.setup.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.minio.setup.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           command:
             - /bin/sh
             - -c
             - |
               set -eu
-              until /usr/bin/mc alias set local "$MINIO_ENDPOINT" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do sleep 1; done;
-              /usr/bin/mc mb --ignore-existing "local/$MINIO_BUCKET";
-              /usr/bin/mc anonymous set none "local/$MINIO_BUCKET" || true;
-              /usr/bin/mc admin config set local api cors_allow_origin="*"
+              until /usr/bin/mc alias set local "$MINIO_ENDPOINT" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do sleep 1; done
+              /usr/bin/mc mb --ignore-existing "local/$MINIO_BUCKET"
+              /usr/bin/mc anonymous set none "local/$MINIO_BUCKET" || true
+              /usr/bin/mc admin config set local api cors_allow_origin="$MINIO_CORS_ALLOWED_ORIGINS"
+      {{- with .Values.minio.setup.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.minio.setup.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.minio.setup.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}

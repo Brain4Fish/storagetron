@@ -1,0 +1,77 @@
+# Production-oriented example. Create the Secret named below before installing:
+#
+# kubectl create secret generic storagetron-secrets \
+#   --from-literal=DATABASE_URL='postgres://user:password@postgres.example.com:5432/storagetron?sslmode=require' \
+#   --from-literal=S3_ACCESS_KEY='...' \
+#   --from-literal=S3_SECRET_KEY='...' \
+#   --from-literal=BACKUP_SECRET_KEY='a-long-stable-random-secret'
+#
+# Keep BACKUP_SECRET_KEY stable after backup targets have been configured.
+
+secret:
+  existingSecret: storagetron-secrets
+
+api:
+  replicaCount: 2
+  image:
+    repository: registry.example.com/storagetron-api
+    tag: "0.2.0"
+  s3:
+    endpoint: https://s3.internal.example.com
+    publicEndpoint: https://s3.example.com
+    bucket: storagetron
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+web:
+  replicaCount: 2
+  image:
+    repository: registry.example.com/storagetron-web
+    tag: "0.2.0"
+  nextPublicApiUrl: https://api.storagetron.example.com
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+postgresql:
+  enabled: false
+
+minio:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: storagetron.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+    - host: api.storagetron.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api
+  tls:
+    - secretName: storagetron-web-tls
+      hosts:
+        - storagetron.example.com
+    - secretName: storagetron-api-tls
+      hosts:
+        - api.storagetron.example.com

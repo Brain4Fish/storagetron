@@ -1,0 +1,366 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Storagetron Helm chart values",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "secret": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "keys": {
+          "type": "object",
+          "required": [
+            "databaseUrl",
+            "s3AccessKey",
+            "s3SecretKey",
+            "backupSecretKey",
+            "postgresqlUsername",
+            "postgresqlPassword",
+            "postgresqlDatabase",
+            "minioRootUser",
+            "minioRootPassword"
+          ],
+          "properties": {
+            "databaseUrl": { "$ref": "#/definitions/secretKey" },
+            "s3AccessKey": { "$ref": "#/definitions/secretKey" },
+            "s3SecretKey": { "$ref": "#/definitions/secretKey" },
+            "backupSecretKey": { "$ref": "#/definitions/secretKey" },
+            "postgresqlUsername": { "$ref": "#/definitions/secretKey" },
+            "postgresqlPassword": { "$ref": "#/definitions/secretKey" },
+            "postgresqlDatabase": { "$ref": "#/definitions/secretKey" },
+            "minioRootUser": { "$ref": "#/definitions/secretKey" },
+            "minioRootPassword": { "$ref": "#/definitions/secretKey" }
+          }
+        }
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "image": { "$ref": "#/definitions/image" },
+        "service": { "$ref": "#/definitions/service" },
+        "databaseUrl": { "type": "string" },
+        "backup": {
+          "type": "object",
+          "properties": {
+            "key": { "type": "string", "minLength": 1 }
+          }
+        },
+        "s3": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "endpoint": { "type": "string" },
+            "publicEndpoint": { "type": "string" },
+            "bucket": { "type": "string", "minLength": 1 },
+            "accessKey": { "type": "string" },
+            "secretKey": { "type": "string" }
+          }
+        },
+        "autoscaling": { "$ref": "#/definitions/autoscaling" },
+        "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" }
+      }
+    },
+    "web": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "image": { "$ref": "#/definitions/image" },
+        "service": { "$ref": "#/definitions/service" },
+        "nextPublicApiUrl": { "type": "string" },
+        "autoscaling": { "$ref": "#/definitions/autoscaling" },
+        "podDisruptionBudget": { "$ref": "#/definitions/podDisruptionBudget" }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "$ref": "#/definitions/image" },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "username": { "type": "string", "minLength": 1 },
+            "password": { "type": "string", "minLength": 1 },
+            "database": { "type": "string", "minLength": 1 }
+          }
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "port": { "$ref": "#/definitions/port" }
+          }
+        },
+        "persistence": { "$ref": "#/definitions/persistence" }
+      }
+    },
+    "minio": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "$ref": "#/definitions/image" },
+        "mcImage": { "$ref": "#/definitions/image" },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "rootUser": { "type": "string", "minLength": 1 },
+            "rootPassword": { "type": "string", "minLength": 1 }
+          }
+        },
+        "bucket": { "type": "string", "minLength": 1 },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": { "$ref": "#/definitions/serviceType" },
+            "apiPort": { "$ref": "#/definitions/port" },
+            "consolePort": { "$ref": "#/definitions/port" }
+          }
+        },
+        "persistence": { "$ref": "#/definitions/persistence" },
+        "setup": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "backoffLimit": { "type": "integer", "minimum": 0 },
+            "corsAllowedOrigins": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["host", "paths"],
+            "properties": {
+              "host": { "type": "string", "minLength": 1 },
+              "paths": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["path", "pathType", "service"],
+                  "properties": {
+                    "path": { "type": "string", "minLength": 1 },
+                    "pathType": {
+                      "type": "string",
+                      "enum": ["Exact", "Prefix", "ImplementationSpecific"]
+                    },
+                    "service": {
+                      "type": "string",
+                      "enum": ["api", "web"]
+                    },
+                    "port": { "$ref": "#/definitions/port" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tls": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "create": { "type": "boolean" },
+        "automountServiceAccountToken": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "name": { "type": "string" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "postgresql": {
+            "properties": {
+              "enabled": { "const": false }
+            }
+          },
+          "secret": {
+            "properties": {
+              "existingSecret": { "const": "" }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "api": {
+            "properties": {
+              "databaseUrl": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "minio": {
+            "properties": {
+              "enabled": { "const": false }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "api": {
+            "properties": {
+              "s3": {
+                "properties": {
+                  "endpoint": { "type": "string", "minLength": 1 },
+                  "publicEndpoint": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "minio": {
+            "properties": {
+              "enabled": { "const": false }
+            }
+          },
+          "secret": {
+            "properties": {
+              "existingSecret": { "const": "" }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "api": {
+            "properties": {
+              "s3": {
+                "properties": {
+                  "accessKey": { "type": "string", "minLength": 1 },
+                  "secretKey": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "secretKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "minLength": 1
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      }
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "serviceType": {
+      "type": "string",
+      "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "$ref": "#/definitions/serviceType" },
+        "port": { "$ref": "#/definitions/port" }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "size": { "type": "string", "minLength": 1 },
+        "storageClass": { "type": "string" }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "targetCPUUtilizationPercentage": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 100
+        },
+        "targetMemoryUtilizationPercentage": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minAvailable": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]+%$" }
+          ]
+        },
+        "maxUnavailable": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]+%$" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

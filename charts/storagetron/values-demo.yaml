@@ -1,0 +1,41 @@
+# Demo install values. This keeps the in-cluster Postgres and MinIO services
+# enabled and stores demo credentials in Helm values. Do not use this pattern
+# for production data.
+
+api:
+  image:
+    repository: registry.example.com/storagetron-api
+    tag: "0.2.0"
+  backup:
+    key: change-this-demo-backup-secret-before-real-use
+
+web:
+  image:
+    repository: registry.example.com/storagetron-web
+    tag: "0.2.0"
+
+postgresql:
+  enabled: true
+  auth:
+    username: app
+    password: change-this-demo-postgres-password
+    database: app
+  persistence:
+    enabled: true
+    size: 8Gi
+
+minio:
+  enabled: true
+  auth:
+    rootUser: minio
+    rootPassword: change-this-demo-minio-password
+  bucket: inventory
+  persistence:
+    enabled: true
+    size: 10Gi
+  setup:
+    corsAllowedOrigins:
+      - http://localhost:3000
+
+ingress:
+  enabled: false

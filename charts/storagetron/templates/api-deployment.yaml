@@ -6,7 +6,9 @@ metadata:
     {{- include "storagetron.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
 spec:
+  {{- if not .Values.api.autoscaling.enabled }}
   replicas: {{ .Values.api.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "storagetron.selectorLabels" . | nindent 6 }}
@@ -25,14 +27,27 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ include "storagetron.serviceAccountName" . }}
-      {{- with .Values.api.imagePullSecrets }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- $imagePullSecrets := concat .Values.imagePullSecrets .Values.api.imagePullSecrets }}
+      {{- with $imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.priorityClassName }}
+      priorityClassName: {{ . | quote }}
       {{- end }}
       containers:
         - name: api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          {{- with .Values.api.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: http
               containerPort: 8080
@@ -41,8 +56,8 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "storagetron.fullname" . }}
-                  key: DATABASE_URL
+                  name: {{ include "storagetron.secretName" . }}
+                  key: {{ .Values.secret.keys.databaseUrl }}
             - name: S3_ENDPOINT
               valueFrom:
                 configMapKeyRef:
@@ -61,26 +76,53 @@ spec:
             - name: S3_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "storagetron.fullname" . }}
-                  key: S3_ACCESS_KEY
+                  name: {{ include "storagetron.secretName" . }}
+                  key: {{ .Values.secret.keys.s3AccessKey }}
             - name: S3_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "storagetron.fullname" . }}
-                  key: S3_SECRET_KEY
+                  name: {{ include "storagetron.secretName" . }}
+                  key: {{ .Values.secret.keys.s3SecretKey }}
             - name: BACKUP_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "storagetron.fullname" . }}
-                  key: BACKUP_SECRET_KEY
+                  name: {{ include "storagetron.secretName" . }}
+                  key: {{ .Values.secret.keys.backupSecretKey }}
             {{- range $name, $value := .Values.api.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- with .Values.api.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.api.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.api.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.api.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.api.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.api.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- with .Values.api.extraVolumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.api.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.api.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -91,5 +133,9 @@ spec:
       {{- end }}
       {{- with .Values.api.tolerations }}
       tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.topologySpreadConstraints }}
+      topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}

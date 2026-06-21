@@ -1,5 +1,27 @@
+# -- Override the chart name used in Kubernetes resource names.
 nameOverride: ""
+# -- Override the full release name used in Kubernetes resource names.
 fullnameOverride: ""
+
+# Shared image pull secrets added to every workload unless a component overrides them.
+imagePullSecrets: []
+
+# Secrets are intentionally explicit. For production, create a Kubernetes Secret
+# outside Helm and set secret.existingSecret. Inline values below are for demos,
+# local clusters, and homelab installs that knowingly accept values-file secrets.
+secret:
+  # -- Name of an existing Secret containing the keys listed below. Preferred for production.
+  existingSecret: ""
+  keys:
+    databaseUrl: DATABASE_URL
+    s3AccessKey: S3_ACCESS_KEY
+    s3SecretKey: S3_SECRET_KEY
+    backupSecretKey: BACKUP_SECRET_KEY
+    postgresqlUsername: POSTGRES_USER
+    postgresqlPassword: POSTGRES_PASSWORD
+    postgresqlDatabase: POSTGRES_DB
+    minioRootUser: MINIO_ROOT_USER
+    minioRootPassword: MINIO_ROOT_PASSWORD
 
 api:
   replicaCount: 1
@@ -13,19 +35,72 @@ api:
     port: 8080
   podAnnotations: {}
   podLabels: {}
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 65532
   resources: {}
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  topologySpreadConstraints: []
+  priorityClassName: ""
   env: {}
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes:
+    - name: tmp
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: tmp
+      mountPath: /tmp
+  livenessProbe:
+    httpGet:
+      path: /version
+      port: http
+    initialDelaySeconds: 20
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /version
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  startupProbe: {}
+  autoscaling:
+    # -- HPA right now is WIP and there possible issues with backup jobs
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: null
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+    maxUnavailable: null
+  # -- External Postgres connection string. Required when postgresql.enabled=false and secret.existingSecret is empty.
   databaseUrl: ""
   backup:
+    # -- Demo fallback only. Keep stable for environments with existing encrypted backup target configuration.
     key: change-this-backup-key-please
   s3:
+    # -- Internal API-facing S3 endpoint. Required when minio.enabled=false.
     endpoint: ""
+    # -- Browser-reachable S3 endpoint used in presigned URLs. Required when minio.enabled=false.
     publicEndpoint: ""
     bucket: inventory
+    # -- Demo fallback only. Prefer secret.existingSecret for production.
     accessKey: ""
+    # -- Demo fallback only. Prefer secret.existingSecret for production.
     secretKey: ""
 
 web:
@@ -40,13 +115,57 @@ web:
     port: 3000
   podAnnotations: {}
   podLabels: {}
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    runAsNonRoot: true
+    runAsUser: 65532
   resources: {}
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  topologySpreadConstraints: []
+  priorityClassName: ""
   env: {}
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  livenessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 20
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  startupProbe: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: null
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+    maxUnavailable: null
+  # -- Browser-facing API URL. Set to your ingress/API URL for real deployments.
   nextPublicApiUrl: ""
 
+# Bundled Postgres is convenient for demos and small trusted clusters. Production
+# users should generally provide managed or separately operated Postgres instead.
 postgresql:
   enabled: true
   image:
@@ -63,8 +182,39 @@ postgresql:
     enabled: true
     size: 8Gi
     storageClass: ""
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    fsGroup: 999
+  securityContext: {}
   resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  priorityClassName: ""
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  livenessProbe:
+    tcpSocket:
+      port: postgresql
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 6
+  readinessProbe:
+    tcpSocket:
+      port: postgresql
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+  startupProbe: {}
 
+# Bundled MinIO mirrors the Docker Compose developer stack. Production users
+# should generally provide managed or separately operated S3-compatible storage.
 minio:
   enabled: true
   image:
@@ -87,9 +237,51 @@ minio:
     enabled: true
     size: 10Gi
     storageClass: ""
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    fsGroup: 1000
+  securityContext: {}
   resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  priorityClassName: ""
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  livenessProbe:
+    httpGet:
+      path: /minio/health/live
+      port: api
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 6
+  readinessProbe:
+    httpGet:
+      path: /minio/health/ready
+      port: api
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+  startupProbe: {}
   setup:
     enabled: true
+    backoffLimit: 6
+    podAnnotations: {}
+    podLabels: {}
+    podSecurityContext: {}
+    securityContext: {}
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    extraEnv: []
+    extraEnvFrom: []
     corsAllowedOrigins:
       - "*"
 
@@ -112,5 +304,6 @@ ingress:
 
 serviceAccount:
   create: true
+  automountServiceAccountToken: false
   annotations: {}
   name: ""

@@ -6,8 +6,26 @@ Web service:
 API service:
   {{ include "storagetron.apiName" . }}:{{ .Values.api.service.port }}
 
-If ingress is disabled, forward the web service locally:
+{{- if .Values.ingress.enabled }}
+Ingress is enabled. Check the configured hosts:
+{{- range .Values.ingress.hosts }}
+  - {{ .host }}
+{{- end }}
+{{- else }}
+Ingress is disabled. Forward the web service locally:
   kubectl port-forward svc/{{ include "storagetron.webName" . }} 3000:{{ .Values.web.service.port }}
 
 Then open:
   http://localhost:3000
+{{- end }}
+
+Security note:
+  Storagetron does not yet provide built-in authentication or authorization.
+  Do not expose it to the public internet without an external access-control layer.
+
+{{- if .Values.secret.existingSecret }}
+Using existing Secret:
+  {{ .Values.secret.existingSecret }}
+{{- else }}
+This release created a Secret from Helm values. Prefer secret.existingSecret for production.
+{{- end }}

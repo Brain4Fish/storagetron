@@ -220,6 +220,14 @@ Check recent runs:
 curl "http://localhost:8086/backup/runs?limit=20"
 ```
 
+## Kubernetes / Helm
+
+A Helm chart is available at [`charts/storagetron`](charts/storagetron/README.md). It supports a quick demo install with bundled Postgres and MinIO, and a production-oriented install path that uses external Postgres, external S3-compatible storage, and a Kubernetes Secret created outside Helm.
+
+The chart can create ingress resources, but Storagetron still does not provide built-in authentication or authorization. Keep it behind a trusted network or an external access-control layer before exposing it beyond your private environment.
+
+Important note about HPA, right now it's a little bit risky for API, because backup job creates on each API instance and doesn't synchronize with other instances which can cause conflicts. Right now you can count HPA as a WIP feature.
+
 ## Development
 
 ### Backend
@@ -285,6 +293,7 @@ internal/config          Environment-based API configuration
 migrations               Forward-only database schema migrations
 pkg/model                Shared API/domain models
 frontend                 Next.js application
+charts                   Helm chart and example values
 deploy                   Deployment support files
 docs                     Architecture and label-printing screenshots
 ```

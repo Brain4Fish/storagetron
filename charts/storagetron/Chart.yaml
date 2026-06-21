@@ -1,6 +1,25 @@
 apiVersion: v2
 name: storagetron
-description: A Helm chart for the Storagetron inventory application
+description: Self-hosted home inventory with a Go API, Next.js UI, Postgres, and S3-compatible object storage
 type: application
-version: 0.2.0
+version: 0.3.0
 appVersion: "0.2.0"
+home: https://github.com/Brain4Fish/storagetron
+keywords:
+  - inventory
+  - home-inventory
+  - self-hosted
+  - postgres
+  - s3
+  - minio
+sources:
+  - https://github.com/Brain4Fish/storagetron
+maintainers:
+  - name: Brain4Fish
+annotations:
+  artifacthub.io/category: storage
+  artifacthub.io/license: MIT
+  artifacthub.io/changes: |
+    - Harden Helm values and templates for public chart use.
+    - Add existingSecret support and production-oriented documentation.
+    - Add probes, security contexts, optional HPA/PDB, and schema validation.

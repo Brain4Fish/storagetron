@@ -40,6 +40,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 {{- end -}}
 
+{{- define "storagetron.secretName" -}}
+{{- default (include "storagetron.fullname" .) .Values.secret.existingSecret -}}
+{{- end -}}
+
 {{- define "storagetron.apiName" -}}
 {{- printf "%s-api" (include "storagetron.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
@@ -97,5 +101,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- .Values.web.nextPublicApiUrl -}}
 {{- else -}}
 {{- printf "http://%s:%v" (include "storagetron.apiName" .) .Values.api.service.port -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "storagetron.ingressServiceName" -}}
+{{- $root := .root -}}
+{{- $path := .path -}}
+{{- if eq $path.service "api" -}}
+{{- include "storagetron.apiName" $root -}}
+{{- else if eq $path.service "web" -}}
+{{- include "storagetron.webName" $root -}}
+{{- else -}}
+{{- fail (printf "ingress path service must be one of api or web, got %q" $path.service) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "storagetron.ingressServicePort" -}}
+{{- $root := .root -}}
+{{- $path := .path -}}
+{{- if $path.port -}}
+{{- $path.port -}}
+{{- else if eq $path.service "api" -}}
+{{- $root.Values.api.service.port -}}
+{{- else if eq $path.service "web" -}}
+{{- $root.Values.web.service.port -}}
+{{- else -}}
+{{- fail (printf "ingress path service must be one of api or web, got %q" $path.service) -}}
 {{- end -}}
 {{- end -}}
