@@ -21,7 +21,7 @@ Moving turns ordinary belongings into a search problem. The item you need is ins
 - Back up Postgres metadata and object storage together.
 - Scrape operational metrics from `/metrics`.
 
-Storagetron is currently best suited for trusted LAN or self-hosted personal use. Add authentication and access control before exposing it to the public internet.
+!!! IMPORTANT NOTE !!! Storagetron is currently best suited for trusted LAN or self-hosted personal use. Add authentication and access control before exposing it to the public internet.
 
 ## Architecture
 

@@ -1,0 +1,116 @@
+nameOverride: ""
+fullnameOverride: ""
+
+api:
+  replicaCount: 1
+  image:
+    repository: storagetron-api
+    pullPolicy: IfNotPresent
+    tag: latest
+  imagePullSecrets: []
+  service:
+    type: ClusterIP
+    port: 8080
+  podAnnotations: {}
+  podLabels: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  env: {}
+  databaseUrl: ""
+  backup:
+    key: change-this-backup-key-please
+  s3:
+    endpoint: ""
+    publicEndpoint: ""
+    bucket: inventory
+    accessKey: ""
+    secretKey: ""
+
+web:
+  replicaCount: 1
+  image:
+    repository: storagetron-web
+    pullPolicy: IfNotPresent
+    tag: latest
+  imagePullSecrets: []
+  service:
+    type: ClusterIP
+    port: 3000
+  podAnnotations: {}
+  podLabels: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  env: {}
+  nextPublicApiUrl: ""
+
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15"
+    pullPolicy: IfNotPresent
+  auth:
+    username: app
+    password: app
+    database: app
+  service:
+    port: 5432
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+  resources: {}
+
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: latest
+    pullPolicy: IfNotPresent
+  mcImage:
+    repository: minio/mc
+    tag: latest
+    pullPolicy: IfNotPresent
+  auth:
+    rootUser: minio
+    rootPassword: minio123
+  bucket: inventory
+  service:
+    type: ClusterIP
+    apiPort: 9000
+    consolePort: 9001
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources: {}
+  setup:
+    enabled: true
+    corsAllowedOrigins:
+      - "*"
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: storagetron.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+    - host: api.storagetron.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api
+  tls: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""

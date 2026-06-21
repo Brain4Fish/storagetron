@@ -1,0 +1,13 @@
+Storagetron has been installed.
+
+Web service:
+  {{ include "storagetron.webName" . }}:{{ .Values.web.service.port }}
+
+API service:
+  {{ include "storagetron.apiName" . }}:{{ .Values.api.service.port }}
+
+If ingress is disabled, forward the web service locally:
+  kubectl port-forward svc/{{ include "storagetron.webName" . }} 3000:{{ .Values.web.service.port }}
+
+Then open:
+  http://localhost:3000

@@ -1,0 +1,49 @@
+{{- if and .Values.minio.enabled .Values.minio.setup.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "storagetron.minioName" . }}-setup
+  labels:
+    {{- include "storagetron.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio-setup
+  annotations:
+    # "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        {{- include "storagetron.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: minio-setup
+          image: "{{ .Values.minio.mcImage.repository }}:{{ .Values.minio.mcImage.tag }}"
+          imagePullPolicy: {{ .Values.minio.mcImage.pullPolicy }}
+          env:
+            - name: MINIO_ENDPOINT
+              value: {{ include "storagetron.s3Endpoint" . | quote }}
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "storagetron.fullname" . }}
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "storagetron.fullname" . }}
+                  key: MINIO_ROOT_PASSWORD
+            - name: MINIO_BUCKET
+              value: {{ include "storagetron.s3Bucket" . | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              until /usr/bin/mc alias set local "$MINIO_ENDPOINT" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do sleep 1; done;
+              /usr/bin/mc mb --ignore-existing "local/$MINIO_BUCKET";
+              /usr/bin/mc anonymous set none "local/$MINIO_BUCKET" || true;
+              /usr/bin/mc admin config set local api cors_allow_origin="*"
+{{- end }}
