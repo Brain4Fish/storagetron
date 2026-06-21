@@ -29,6 +29,7 @@ func NewS3(cfg config.Config) *S3 {
 	if err != nil {
 		panic(err)
 	}
+	awsCfg.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
 
 	internalClient := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(cfg.S3Endpoint) // minio:9000

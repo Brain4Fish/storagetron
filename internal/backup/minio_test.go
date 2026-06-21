@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -28,6 +29,17 @@ func TestExportImportObjectsRoundTrip(t *testing.T) {
 	require.Equal(t, "image/jpeg", destination.objects["items/one.jpg"].contentType)
 	require.Equal(t, []byte("notes"), destination.objects["docs/readme.txt"].body)
 	require.Equal(t, "text/plain", destination.objects["docs/readme.txt"].contentType)
+}
+
+func TestImportObjectsProvidesSeekableBodies(t *testing.T) {
+	archive := filepath.Join(t.TempDir(), "minio.tar.zst")
+	require.NoError(t, writeObjectArchive(archive, "config", []byte("settings"), "application/octet-stream"))
+
+	destination := &seekableObjectStorage{memoryObjectStorage: newMemoryObjectStorage()}
+	require.NoError(t, ImportObjects(context.Background(), destination, archive))
+
+	require.True(t, destination.sawSeekable)
+	require.Equal(t, []byte("settings"), destination.objects["config"].body)
 }
 
 func TestExportObjectsRejectsUnsafeKeys(t *testing.T) {
@@ -94,6 +106,27 @@ func (s *memoryObjectStorage) PutObject(_ context.Context, key string, body io.R
 	}
 	s.objects[key] = memoryObject{body: data, contentType: contentType}
 	return nil
+}
+
+type seekableObjectStorage struct {
+	*memoryObjectStorage
+	sawSeekable bool
+}
+
+func (s *seekableObjectStorage) PutObject(ctx context.Context, key string, body io.Reader, size int64, contentType string) error {
+	seeker, ok := body.(io.Seeker)
+	if !ok {
+		return errors.New("put object body is not seekable")
+	}
+	offset, err := seeker.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	if offset != 0 {
+		return errors.New("put object body was not rewound")
+	}
+	s.sawSeekable = true
+	return s.memoryObjectStorage.PutObject(ctx, key, body, size, contentType)
 }
 
 func writeObjectArchive(path, key string, body []byte, contentType string) error {

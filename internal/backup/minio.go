@@ -112,10 +112,41 @@ func ImportObjects(ctx context.Context, storage ObjectStorage, source string) er
 		if header.PAXRecords != nil {
 			contentType = header.PAXRecords["storagetron.content_type"]
 		}
-		if err := storage.PutObject(ctx, header.Name, tr, header.Size, contentType); err != nil {
+		if err := importObjectEntry(ctx, storage, filepath.Dir(source), header, tr, contentType); err != nil {
 			return fmt.Errorf("restore minio object %q: %w", header.Name, err)
 		}
 	}
+}
+
+func importObjectEntry(ctx context.Context, storage ObjectStorage, tempDir string, header *tar.Header, body io.Reader, contentType string) error {
+	tempFile, err := os.CreateTemp(tempDir, "storagetron-minio-object-*")
+	if err != nil {
+		return fmt.Errorf("create staged minio object: %w", err)
+	}
+	tempPath := tempFile.Name()
+	defer os.Remove(tempPath)
+
+	copied, err := io.Copy(tempFile, body)
+	if err != nil {
+		_ = tempFile.Close()
+		return fmt.Errorf("stage minio object: %w", err)
+	}
+	if copied != header.Size {
+		_ = tempFile.Close()
+		return fmt.Errorf("stage minio object: copied %d bytes, expected %d", copied, header.Size)
+	}
+	if _, err := tempFile.Seek(0, io.SeekStart); err != nil {
+		_ = tempFile.Close()
+		return fmt.Errorf("rewind staged minio object: %w", err)
+	}
+	if err := storage.PutObject(ctx, header.Name, tempFile, header.Size, contentType); err != nil {
+		_ = tempFile.Close()
+		return err
+	}
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("close staged minio object: %w", err)
+	}
+	return nil
 }
 
 func safeObjectKey(key string) bool {
