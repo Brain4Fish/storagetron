@@ -12,8 +12,8 @@ export function AppHeader() {
                     <Link href="/items" className="hover:text-foreground">
                         Items
                     </Link>
-                    <Link href="/kits" className="hover:text-foreground">
-                        Kits
+                    <Link href="/containers" className="hover:text-foreground">
+                        Containers
                     </Link>
                     <Link href="/scan" className="hover:text-foreground">
                         Scan

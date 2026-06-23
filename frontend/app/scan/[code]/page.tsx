@@ -28,7 +28,7 @@ export default function ScanCodePage() {
         if (result?.type === "item" && result.item?.id) {
             router.replace(`/items/${result.item.id}`);
         } else if (result?.type === "container" && result.container?.id) {
-            router.replace(`/kits/${result.container.id}`);
+            router.replace(`/containers/${result.container.id}`);
         }
     }, [router, scanQuery.data]);
 

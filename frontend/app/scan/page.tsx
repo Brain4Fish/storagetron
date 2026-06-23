@@ -52,9 +52,9 @@ export default function ScanPage() {
             if (data.type === "item" && data.item?.id) {
                 router.push(`/items/${data.item.id}`);
             } else if (data.type === "container" && data.container?.id) {
-                router.push(`/kits/${data.container.id}`);
+                router.push(`/containers/${data.container.id}`);
             } else {
-                setCameraError("Scanned code is not linked to an item or kit.");
+                setCameraError("Scanned code is not linked to an item or container.");
             }
         },
         onError: (err) => {

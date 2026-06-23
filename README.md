@@ -25,8 +25,6 @@ Moving turns ordinary belongings into a search problem. The item you need is ins
 
 ## Architecture
 
-<img alt="Storagetron architecture" src="./docs/arch-1.png" width="1000"/>
-
 ```mermaid
 flowchart TD
     User[Browser / mobile scanner] --> Web[Next.js web UI]
@@ -57,6 +55,15 @@ flowchart TD
 - Export flows for CSV/XLSX label-printing workflows.
 - Backup targets, schedules, manual backup runs, restore runs, and retention policy.
 - Prometheus metrics for HTTP traffic, build info, Postgres pool stats, backups, and restores.
+
+## Screenshots
+
+![overview](./docs/overview.png)
+
+|                              |                                      |
+|:----------------------------:|:------------------------------------:|
+|  ![items](./docs/items.png)  | ![containers](./docs/containers.png) |
+| ![backups](./docs/backups.png) | ![locations](./docs/locations.png)  |
 
 ## Quick Start
 
@@ -319,7 +326,7 @@ docs                     Architecture and label-printing screenshots
 - Scrape `/metrics` for API, runtime, Postgres pool, backup, and restore metrics.
 - Alert on failed backup or restore runs if this is used for irreplaceable data.
 
-## Screenshots / Label Printing
+## Label Printing
 
 Storagetron can export selected items or kits for external label-printer software. The current workflow is tested with the official NIIMBOT app.
 
@@ -344,6 +351,10 @@ Storagetron can export selected items or kits for external label-printer softwar
    <img alt="Template settings" src="./docs/doc-5.png" width="1000"/>
 
 6. Print from the NIIMBOT app.
+
+Niimbot app doesn't allow to share design. Because of that I can just share my design as a screenshot:
+
+![sample_niimbot_design](./docs/doc-6.png)
 
 ## Roadmap
 

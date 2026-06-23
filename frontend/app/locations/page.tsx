@@ -75,7 +75,7 @@ export default function LocationsPage() {
             <div className="space-y-3">
                 <div>
                     <h1 className="text-2xl font-semibold">Locations</h1>
-                    <p className="text-sm text-muted-foreground">Country, city, room, and shelf records for assets and kits.</p>
+                    <p className="text-sm text-muted-foreground">Country, city, room, and shelf records for items and containers.</p>
                 </div>
 
                 <form onSubmit={onSubmit} className="floating-window grid gap-3 rounded-2xl p-3 md:grid-cols-5 md:items-end">

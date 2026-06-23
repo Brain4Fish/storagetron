@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { Download, Plus, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Container } from "@/lib/api";
 import { downloadSelectedKitsXlsx } from "@/lib/export-assets";
@@ -78,7 +78,7 @@ export default function KitsPage() {
         try {
             await downloadSelectedKitsXlsx(selectedContainerIds);
         } catch (err) {
-            setExportError(err instanceof Error ? err.message : "Failed to export selected kits.");
+            setExportError(err instanceof Error ? err.message : "Failed to export selected containers.");
         } finally {
             setIsExporting(false);
         }
@@ -90,7 +90,7 @@ export default function KitsPage() {
         setDeleteRequest({
             ids,
             subject,
-            title: ids.length === 1 ? "Delete kit" : "Delete kits",
+            title: ids.length === 1 ? "Delete container" : "Delete containers",
         });
     };
 
@@ -101,7 +101,7 @@ export default function KitsPage() {
     const openDeleteSelected = () => {
         const ids = Array.from(selectedContainerIds);
         if (ids.length === 0) return;
-        openDeleteKits(ids, `${ids.length} selected kit${ids.length === 1 ? "" : "s"}`);
+        openDeleteKits(ids, `${ids.length} selected container${ids.length === 1 ? "" : "s"}`);
     };
 
     const confirmDelete = async () => {
@@ -137,7 +137,7 @@ export default function KitsPage() {
 
         const message = deletedIds.length > 0
             ? `Deleted ${deletedIds.length} of ${ids.length}. ${failedCount} failed.`
-            : `Could not delete ${ids.length === 1 ? "this kit" : "these kits"}.`;
+            : `Could not delete ${ids.length === 1 ? "this container" : "these containers"}.`;
 
         if (deletedIds.length > 0) {
             setDeleteRequest(null);
@@ -149,17 +149,23 @@ export default function KitsPage() {
 
     return (
         <PageShell>
-            <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
+            <div className="space-y-5 pt-16 md:pt-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-semibold">Kits</h1>
-                        <p className="text-sm text-muted-foreground">Boxes, shelves, rooms, and grouped assets.</p>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-3xl font-semibold tracking-tight">Containers</h1>
+                            <span className="rounded-lg bg-zinc-100 px-2.5 py-1 text-sm text-muted-foreground">{containers.length} containers</span>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">Boxes, shelves, rooms, and grouped items.</p>
                     </div>
-                    <Button onClick={() => setOpen(true)}>New kit</Button>
+                    <Button onClick={() => setOpen(true)}>
+                        <Plus className="h-4 w-4" />
+                        Add Container
+                    </Button>
                 </div>
 
                 {selectedCount > 0 ? (
-                    <div className="floating-window flex flex-col gap-2 rounded-2xl p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="apple-card flex flex-col gap-3 rounded-2xl p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <span className="font-medium">{selectedCount} selected</span>
                             {selectedContainers.length > 0 ? (
@@ -186,7 +192,7 @@ export default function KitsPage() {
                 ) : null}
 
                 {isLoading ? (
-                    <p className="text-gray-500">Loading...</p>
+                    <p className="text-sm text-muted-foreground">Loading containers...</p>
                 ) : (
                     <ContainersTable
                         containers={containers}
@@ -201,7 +207,7 @@ export default function KitsPage() {
             <CreateContainerDialog open={open} onOpenChange={setOpen} />
             <DeleteConfirmationDialog
                 open={deleteRequest !== null}
-                title={deleteRequest?.title ?? "Delete kits"}
+                title={deleteRequest?.title ?? "Delete containers"}
                 isDeleting={isDeleting}
                 error={deleteError}
                 onOpenChange={(nextOpen) => {
@@ -209,7 +215,7 @@ export default function KitsPage() {
                 }}
                 onConfirm={confirmDelete}
             >
-                This permanently deletes <span className="font-semibold text-zinc-950">{deleteRequest?.subject}</span>. Assets inside deleted kits stay in inventory.
+                This permanently deletes <span className="font-semibold text-zinc-950">{deleteRequest?.subject}</span>. Items inside deleted containers stay in inventory.
             </DeleteConfirmationDialog>
         </PageShell>
     );

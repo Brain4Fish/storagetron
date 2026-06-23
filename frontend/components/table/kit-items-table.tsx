@@ -26,8 +26,8 @@ export function KitItemsTable({
                               }: Props) {
     if (items.length === 0) {
         return (
-            <div className="rounded-xl border bg-white p-6 text-sm text-gray-500">
-                No items in this kit yet.
+            <div className="apple-card rounded-2xl p-6 text-sm text-muted-foreground">
+                No items in this container yet.
             </div>
         );
     }
@@ -40,29 +40,29 @@ export function KitItemsTable({
     return (
         <>
         <div className="space-y-3 md:hidden">
-            <label className="flex items-center gap-3 rounded-xl border bg-white px-4 py-3 text-sm text-muted-foreground">
+            <label className="apple-card flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-muted-foreground">
                 <input
                     type="checkbox"
-                    aria-label="Select all visible kit assets"
+                    aria-label="Select all visible container items"
                     checked={allVisibleSelected}
                     ref={(input) => {
                         if (input) input.indeterminate = someVisibleSelected;
                     }}
                     onChange={(event) => onToggleItems(visibleItemIds, event.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 accent-orange-600"
+                    className="h-4 w-4 rounded border-gray-300 accent-primary"
                 />
-                <span>{allVisibleSelected ? "All visible kit assets selected" : "Select visible kit assets"}</span>
+                <span>{allVisibleSelected ? "All visible container items selected" : "Select visible container items"}</span>
             </label>
 
             {items.map((item) => (
-                <article key={item.id} className="rounded-xl border bg-white p-3 shadow-soft">
+                <article key={item.id} className="apple-card rounded-2xl p-3">
                     <div className="flex gap-3">
                         <input
                             type="checkbox"
                             aria-label={`Select ${item.name}`}
                             checked={selectedItemIds.has(item.id)}
                             onChange={() => onToggleItem(item.id)}
-                            className="mt-2 h-4 w-4 shrink-0 rounded border-gray-300 accent-orange-600"
+                            className="mt-2 h-4 w-4 shrink-0 rounded border-gray-300 accent-primary"
                         />
                         <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100 text-muted-foreground">
                             {item.photos?.[0]?.url ? (
@@ -83,7 +83,7 @@ export function KitItemsTable({
                                 {onRemove ? (
                                     <button
                                         type="button"
-                                        aria-label={`Remove ${item.name} from kit`}
+                                        aria-label={`Remove ${item.name} from container`}
                                         disabled={removingItemId === item.id}
                                         onClick={() => onRemove(item.id)}
                                         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70"
@@ -101,12 +101,12 @@ export function KitItemsTable({
                             ) : null}
                             <div className="mt-2 flex flex-wrap gap-1.5">
                                 {formatLocation(effectiveItemLocation(item)) ? (
-                                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                                    <span className="status-pill bg-zinc-100 text-zinc-700">
                                         {formatLocation(effectiveItemLocation(item))}
-                                        {isInheritedItemLocation(item) ? " (kit)" : ""}
+                                        {isInheritedItemLocation(item) ? " (container)" : ""}
                                     </span>
                                 ) : (
-                                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500">No location</span>
+                                    <span className="status-pill bg-zinc-100 text-muted-foreground">No location</span>
                                 )}
                             </div>
                             <div className="mt-2 text-xs text-muted-foreground">
@@ -118,21 +118,21 @@ export function KitItemsTable({
             ))}
         </div>
 
-        <div className="hidden overflow-hidden rounded-xl border bg-white md:block">
+        <div className="apple-card hidden overflow-hidden rounded-2xl md:block">
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[620px] text-sm">
-                    <thead className="bg-gray-50 text-gray-500">
+                    <thead className="bg-zinc-50 text-xs font-medium text-muted-foreground">
                     <tr>
                         <th className="w-12 p-3 text-left">
                             <input
                                 type="checkbox"
-                                aria-label="Select all visible kit assets"
+                                aria-label="Select all visible container items"
                                 checked={allVisibleSelected}
                                 ref={(input) => {
                                     if (input) input.indeterminate = someVisibleSelected;
                                 }}
                                 onChange={(event) => onToggleItems(visibleItemIds, event.target.checked)}
-                                className="h-4 w-4 rounded border-gray-300 accent-orange-600"
+                                className="h-4 w-4 rounded border-gray-300 accent-primary"
                             />
                         </th>
                         <th className="p-3 text-left">Item</th>
@@ -143,14 +143,14 @@ export function KitItemsTable({
                     </thead>
                     <tbody>
                     {items.map((item) => (
-                        <tr key={item.id} className="group border-t hover:bg-gray-50">
+                        <tr key={item.id} className="group border-t border-border hover:bg-zinc-50">
                             <td className="p-3">
                                 <input
                                     type="checkbox"
                                     aria-label={`Select ${item.name}`}
                                     checked={selectedItemIds.has(item.id)}
                                     onChange={() => onToggleItem(item.id)}
-                                    className="h-4 w-4 rounded border-gray-300 accent-orange-600"
+                                    className="h-4 w-4 rounded border-gray-300 accent-primary"
                                 />
                             </td>
                             <td className="p-3">
@@ -180,9 +180,9 @@ export function KitItemsTable({
                             </td>
                             <td className="p-3">
                                 {formatLocation(effectiveItemLocation(item)) ? (
-                                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                                    <span className="status-pill bg-zinc-100 text-zinc-700">
                                         {formatLocation(effectiveItemLocation(item))}
-                                        {isInheritedItemLocation(item) ? " (kit)" : ""}
+                                        {isInheritedItemLocation(item) ? " (container)" : ""}
                                     </span>
                                 ) : (
                                     <span className="text-xs text-gray-500">No location</span>
@@ -193,7 +193,7 @@ export function KitItemsTable({
                                 {onRemove ? (
                                     <button
                                         type="button"
-                                        aria-label={`Remove ${item.name} from kit`}
+                                        aria-label={`Remove ${item.name} from container`}
                                         disabled={removingItemId === item.id}
                                         onClick={() => onRemove(item.id)}
                                         className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground opacity-0 transition hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 disabled:opacity-70"

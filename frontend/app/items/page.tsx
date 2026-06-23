@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Download, Trash2 } from "lucide-react";
+import { Download, Filter, Plus, Search, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Item } from "@/lib/api";
+import { buildItemRows } from "@/lib/inventory-view";
 import { downloadSelectedAssetsXlsx } from "@/lib/export-assets";
 import { PageShell } from "@/components/page-shell";
 import { ItemsTable } from "@/components/table/items-table";
@@ -12,7 +13,7 @@ import { CreateItemDialog } from "@/components/forms/create-item-dialog";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 
-const ITEMS_PAGE_SIZE = 25;
+const ITEMS_PAGE_SIZE = 20;
 
 type DeleteRequest = {
     ids: string[];
@@ -24,6 +25,10 @@ export default function ItemsPage() {
     const queryClient = useQueryClient();
     const [open, setOpen] = useState(false);
     const [page, setPage] = useState(0);
+    const [query, setQuery] = useState("");
+    const [locationFilter, setLocationFilter] = useState("all");
+    const [containerFilter, setContainerFilter] = useState("all");
+    const [statusFilter, setStatusFilter] = useState("all");
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState("");
@@ -32,13 +37,29 @@ export default function ItemsPage() {
     const [deleteError, setDeleteError] = useState("");
     const [actionError, setActionError] = useState("");
 
-    const { data, isLoading, isFetching } = useQuery({
-        queryKey: ["items", page, ITEMS_PAGE_SIZE],
-        queryFn: () => api.listItemsPage({ limit: ITEMS_PAGE_SIZE, offset: page * ITEMS_PAGE_SIZE }),
-    });
-    const items = data?.items ?? [];
-    const totalItems = data?.total ?? 0;
+    const itemsQuery = useQuery({ queryKey: ["items"], queryFn: api.listItems });
+    const containersQuery = useQuery({ queryKey: ["containers"], queryFn: api.listContainers });
+    const items = itemsQuery.data ?? [];
+    const containers = containersQuery.data ?? [];
+
+    const rows = useMemo(() => buildItemRows(items, containers), [items, containers]);
+    const locationOptions = useMemo(() => Array.from(new Set(rows.map((row) => row.locationLabel))).sort(), [rows]);
+    const containerOptions = useMemo(() => Array.from(new Set(rows.map((row) => row.containerLabel))).sort(), [rows]);
+    const filteredRows = useMemo(() => {
+        const normalizedQuery = query.trim().toLowerCase();
+
+        return rows.filter((row) => {
+            if (normalizedQuery && !row.searchableText.includes(normalizedQuery)) return false;
+            if (locationFilter !== "all" && row.locationLabel !== locationFilter) return false;
+            if (containerFilter !== "all" && row.containerLabel !== containerFilter) return false;
+            if (statusFilter !== "all" && row.status !== statusFilter) return false;
+            return true;
+        });
+    }, [containerFilter, locationFilter, query, rows, statusFilter]);
+
+    const totalItems = filteredRows.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PAGE_SIZE));
+    const pageRows = filteredRows.slice(page * ITEMS_PAGE_SIZE, (page + 1) * ITEMS_PAGE_SIZE);
     const pageStart = totalItems === 0 ? 0 : page * ITEMS_PAGE_SIZE + 1;
     const pageEnd = Math.min((page + 1) * ITEMS_PAGE_SIZE, totalItems);
     const canGoPrevious = page > 0;
@@ -46,9 +67,19 @@ export default function ItemsPage() {
     const selectedCount = selectedItemIds.size;
 
     const selectedItems = useMemo(
-        () => items.filter((item) => selectedItemIds.has(item.id)),
-        [items, selectedItemIds],
+        () => rows.filter((row) => selectedItemIds.has(row.item.id)),
+        [rows, selectedItemIds],
     );
+
+    useEffect(() => {
+        setPage(0);
+    }, [containerFilter, locationFilter, query, statusFilter]);
+
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get("status") === "loose") {
+            setStatusFilter("loose");
+        }
+    }, []);
 
     const toggleItem = (itemId: string) => {
         setSelectedItemIds((current) => {
@@ -81,8 +112,14 @@ export default function ItemsPage() {
         setActionError("");
         setSelectedItemIds(new Set());
     };
+    const clearFilters = () => {
+        setQuery("");
+        setLocationFilter("all");
+        setContainerFilter("all");
+        setStatusFilter("all");
+    };
     const goToPreviousPage = () => setPage((current) => Math.max(0, current - 1));
-    const goToNextPage = () => setPage((current) => current + 1);
+    const goToNextPage = () => setPage((current) => Math.min(totalPages - 1, current + 1));
     const downloadSelectedXlsx = async () => {
         setIsExporting(true);
         setExportError("");
@@ -90,7 +127,7 @@ export default function ItemsPage() {
         try {
             await downloadSelectedAssetsXlsx(selectedItemIds);
         } catch (err) {
-            setExportError(err instanceof Error ? err.message : "Failed to export selected assets.");
+            setExportError(err instanceof Error ? err.message : "Failed to export selected items.");
         } finally {
             setIsExporting(false);
         }
@@ -102,7 +139,7 @@ export default function ItemsPage() {
         setDeleteRequest({
             ids,
             subject,
-            title: ids.length === 1 ? "Delete asset" : "Delete assets",
+            title: ids.length === 1 ? "Delete item" : "Delete items",
         });
     };
 
@@ -113,7 +150,7 @@ export default function ItemsPage() {
     const openDeleteSelected = () => {
         const ids = Array.from(selectedItemIds);
         if (ids.length === 0) return;
-        openDeleteItems(ids, `${ids.length} selected asset${ids.length === 1 ? "" : "s"}`);
+        openDeleteItems(ids, `${ids.length} selected item${ids.length === 1 ? "" : "s"}`);
     };
 
     const confirmDelete = async () => {
@@ -138,7 +175,7 @@ export default function ItemsPage() {
                 queryClient.invalidateQueries({ queryKey: ["items"] }),
                 queryClient.invalidateQueries({ queryKey: ["containers"] }),
             ]);
-            if (page > 0 && deletedIds.length >= items.length) {
+            if (page > 0 && deletedIds.length >= pageRows.length) {
                 setPage((current) => Math.max(0, current - 1));
             }
         }
@@ -152,7 +189,7 @@ export default function ItemsPage() {
 
         const message = deletedIds.length > 0
             ? `Deleted ${deletedIds.length} of ${ids.length}. ${failedCount} failed.`
-            : `Could not delete ${ids.length === 1 ? "this asset" : "these assets"}.`;
+            : `Could not delete ${ids.length === 1 ? "this item" : "these items"}.`;
 
         if (deletedIds.length > 0) {
             setDeleteRequest(null);
@@ -164,27 +201,68 @@ export default function ItemsPage() {
 
     return (
         <PageShell>
-            <div className="space-y-3">
-                {/* Header */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <h1 className="text-2xl font-semibold">Assets</h1>
-
+            <div className="space-y-5 pt-16 md:pt-0">
+                <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-3xl font-semibold tracking-tight">Items</h1>
+                            <span className="rounded-lg bg-zinc-100 px-2.5 py-1 text-sm text-muted-foreground">{items.length} items</span>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">All your items in one place. Search, filter, and organize.</p>
+                    </div>
                     <div className="flex flex-wrap gap-2">
-                        <Link href="/kits">
-                            <Button variant="outline">Kits</Button>
-                        </Link>
+                        <Button variant="outline" onClick={downloadSelectedXlsx} disabled={selectedCount === 0 || isExporting}>
+                            <Download className="h-4 w-4" />
+                            {isExporting ? "Preparing..." : "Export"}
+                        </Button>
                         <Button onClick={() => setOpen(true)}>
-                            New asset
+                            <Plus className="h-4 w-4" />
+                            Add Item
                         </Button>
                     </div>
-                </div>
+                </header>
+
+                <section className="apple-card rounded-2xl p-4">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                        <label className="relative block">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                placeholder="Search items by name, description, barcode, or note..."
+                                className="h-11 w-full rounded-xl border border-border bg-white pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                            />
+                        </label>
+                        <Button variant="outline" onClick={clearFilters}>
+                            <Filter className="h-4 w-4" />
+                            Clear filters
+                        </Button>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        <FilterSelect label="Location" value={locationFilter} onChange={setLocationFilter} options={locationOptions} />
+                        <FilterSelect label="Container" value={containerFilter} onChange={setContainerFilter} options={containerOptions} />
+                        <FilterSelect
+                            label="Status"
+                            value={statusFilter}
+                            onChange={setStatusFilter}
+                            options={["stored", "loose"]}
+                            labels={{ stored: "In Storage", loose: "No Container" }}
+                        />
+                        <div className="grid gap-1 text-xs font-medium text-muted-foreground">
+                            Containers
+                            <Link href="/containers">
+                                <Button variant="outline" className="h-10 w-full">Browse Containers</Button>
+                            </Link>
+                        </div>
+                    </div>
+                </section>
 
                 {selectedCount > 0 ? (
-                    <div className="floating-window flex flex-col gap-2 rounded-2xl p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="apple-card flex flex-col gap-3 rounded-2xl p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <span className="font-medium">{selectedCount} selected</span>
                             {selectedItems.length > 0 ? (
-                                <span className="text-muted-foreground"> · {selectedItems.length} loaded on this page</span>
+                                <span className="text-muted-foreground"> / {selectedItems.length} loaded</span>
                             ) : null}
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -206,28 +284,28 @@ export default function ItemsPage() {
                     </div>
                 ) : null}
 
-                {/* Table */}
-                {isLoading ? (
-                    <p className="text-gray-500">Loading...</p>
+                {itemsQuery.isLoading || containersQuery.isLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading items...</p>
                 ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         <ItemsTable
-                            items={items}
+                            rows={pageRows}
                             selectedItemIds={selectedItemIds}
                             onToggleItem={toggleItem}
                             onToggleItems={toggleItems}
                             onDeleteItem={openDeleteItem}
                         />
 
-                        <div className="floating-window flex flex-col gap-2 rounded-2xl p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                        <div className="apple-card flex flex-col gap-3 rounded-2xl p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                {totalItems === 0 ? "No assets" : `Showing ${pageStart}-${pageEnd} of ${totalItems}`}
-                                {isFetching ? <span> · Updating...</span> : null}
+                                {totalItems === 0 ? "No items" : `Showing ${pageStart}-${pageEnd} of ${totalItems}`}
+                                {itemsQuery.isFetching || containersQuery.isFetching ? <span> / Updating...</span> : null}
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                                 <Button variant="outline" disabled={!canGoPrevious} onClick={goToPreviousPage}>
                                     Previous
                                 </Button>
+                                <span className="rounded-lg border border-border px-3 py-2 text-zinc-950">{page + 1}</span>
                                 <Button variant="outline" disabled={!canGoNext} onClick={goToNextPage}>
                                     Next
                                 </Button>
@@ -240,7 +318,7 @@ export default function ItemsPage() {
             <CreateItemDialog open={open} onOpenChange={setOpen} />
             <DeleteConfirmationDialog
                 open={deleteRequest !== null}
-                title={deleteRequest?.title ?? "Delete assets"}
+                title={deleteRequest?.title ?? "Delete items"}
                 isDeleting={isDeleting}
                 error={deleteError}
                 onOpenChange={(nextOpen) => {
@@ -251,5 +329,35 @@ export default function ItemsPage() {
                 This permanently deletes <span className="font-semibold text-zinc-950">{deleteRequest?.subject}</span>, including photos and labels.
             </DeleteConfirmationDialog>
         </PageShell>
+    );
+}
+
+function FilterSelect({
+    label,
+    value,
+    onChange,
+    options,
+    labels,
+}: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    options: string[];
+    labels?: Record<string, string>;
+}) {
+    return (
+        <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+            {label}
+            <select
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-white px-3 text-sm font-normal text-zinc-950 outline-none focus:ring-2 focus:ring-ring"
+            >
+                <option value="all">All</option>
+                {options.map((option) => (
+                    <option key={option} value={option}>{labels?.[option] ?? option}</option>
+                ))}
+            </select>
+        </label>
     );
 }

@@ -1,7 +1,8 @@
 "use client";
 
+import type React from "react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ArchiveRestore, CheckCircle2, Edit3, Play, Plus, RotateCcw, Trash2, XCircle } from "lucide-react";
+import { ArchiveRestore, CheckCircle2, ChevronRight, Clock3, Edit3, HardDrive, Play, Plus, RotateCcw, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     api,
@@ -248,6 +249,29 @@ export default function BackupsPage() {
 
     const selectedManualBackupTarget = manualBackupTargetId || enabledTargets[0]?.id || "";
     const selectedManualRestoreTarget = manualRestoreTargetId || targets[0]?.id || "";
+    const sortedBackupRuns = useMemo(
+        () => [...backupRuns].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+        [backupRuns],
+    );
+    const latestSuccessfulBackup = sortedBackupRuns.find((run) => run.status === "completed");
+    const latestFailedBackup = sortedBackupRuns.find((run) => run.status === "failed");
+    const lastSuccessAgeHours = latestSuccessfulBackup
+        ? (Date.now() - new Date(latestSuccessfulBackup.finished_at ?? latestSuccessfulBackup.updated_at ?? latestSuccessfulBackup.created_at).getTime()) / 36e5
+        : Number.POSITIVE_INFINITY;
+    const backupHealth = enabledTargets.length === 0 || schedules.length === 0
+        ? "warning"
+        : latestFailedBackup && (!latestSuccessfulBackup || new Date(latestFailedBackup.created_at) > new Date(latestSuccessfulBackup.created_at))
+            ? "error"
+            : lastSuccessAgeHours <= 26
+                ? "protected"
+                : "warning";
+    const completedRuns = useMemo(
+        () => backupRuns
+            .filter((run) => run.status === "completed" && run.backup_path)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+        [backupRuns],
+    );
+    const totalBackupSize = backupRuns.reduce((total, run) => total + (run.size_bytes ?? 0), 0);
 
     useEffect(() => {
         const firstEnabledTargetID = enabledTargets[0]?.id;
@@ -376,13 +400,169 @@ export default function BackupsPage() {
 
     return (
         <PageShell>
-            <div className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-5 pt-16 md:pt-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-semibold">Backups</h1>
-                        <p className="text-sm text-muted-foreground">Targets, schedules, backup history, and restore jobs.</p>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-3xl font-semibold tracking-tight">Backups</h1>
+                            <span className={cn(
+                                "status-pill",
+                                backupHealth === "protected" && "bg-emerald-50 text-emerald-700",
+                                backupHealth === "warning" && "bg-amber-50 text-amber-700",
+                                backupHealth === "error" && "bg-red-50 text-red-700",
+                            )}>
+                                {backupHealth === "protected" ? "Protected" : backupHealth === "warning" ? "Needs attention" : "Backup issue"}
+                            </span>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">Your backup targets, history, and restore readiness.</p>
                     </div>
-                    <div className="floating-window flex w-full gap-1 rounded-2xl p-1 sm:w-auto">
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => setActiveTab("restore")}>
+                            <ArchiveRestore className="h-4 w-4" />
+                            Restore
+                        </Button>
+                        <form onSubmit={submitManualBackup}>
+                            <Button type="submit" disabled={createBackupMutation.isPending || enabledTargets.length === 0}>
+                                <Play className="h-4 w-4" />
+                                {createBackupMutation.isPending ? "Enqueuing..." : "Run Backup Now"}
+                            </Button>
+                        </form>
+                    </div>
+                </div>
+
+                {error ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+                ) : null}
+
+                <section className="apple-card rounded-2xl p-5">
+                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                        <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+                            <div className={cn(
+                                "flex h-28 w-28 shrink-0 items-center justify-center rounded-[2rem]",
+                                backupHealth === "protected" && "bg-emerald-50 text-emerald-600",
+                                backupHealth === "warning" && "bg-amber-50 text-amber-600",
+                                backupHealth === "error" && "bg-red-50 text-red-600",
+                            )}>
+                                {backupHealth === "error" ? <XCircle className="h-14 w-14" /> : <ShieldCheck className="h-14 w-14" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h2 className={cn(
+                                    "text-2xl font-semibold",
+                                    backupHealth === "protected" && "text-emerald-700",
+                                    backupHealth === "warning" && "text-amber-700",
+                                    backupHealth === "error" && "text-red-700",
+                                )}>
+                                    {backupHealth === "protected" ? "Protected" : backupHealth === "warning" ? "Review backup setup" : "Backup needs attention"}
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    {backupHealth === "protected"
+                                        ? "Your data has a recent successful backup."
+                                        : "Check targets, schedules, and recent runs before relying on restore."}
+                                </p>
+                                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                                    <BackupMetric
+                                        icon={CheckCircle2}
+                                        label="Last successful backup"
+                                        value={latestSuccessfulBackup ? formatDate(latestSuccessfulBackup.finished_at ?? latestSuccessfulBackup.created_at) : "No successful backup"}
+                                    />
+                                    <BackupMetric
+                                        icon={Clock3}
+                                        label="Schedules"
+                                        value={`${schedules.filter((schedule) => schedule.enabled).length} enabled`}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-zinc-50 p-4">
+                            <h3 className="font-semibold">Backup Health</h3>
+                            <div className="mt-4 grid gap-3 text-sm">
+                                <HealthLine ok={enabledTargets.length > 0} label={`${enabledTargets.length} enabled target${enabledTargets.length === 1 ? "" : "s"}`} />
+                                <HealthLine ok={schedules.some((schedule) => schedule.enabled)} label="Schedule configured" />
+                                <HealthLine ok={Boolean(latestSuccessfulBackup)} label="Successful backup available" />
+                                <HealthLine ok={restoreRuns.some((run) => run.status === "completed")} label="Restore tested" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+                    <div className="apple-card rounded-2xl p-5">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">Backup Targets</h2>
+                            <Button variant="outline" size="sm" onClick={() => setActiveTab("targets")}>
+                                <Plus className="h-4 w-4" />
+                                Add Target
+                            </Button>
+                        </div>
+                        <div className="grid gap-3">
+                            {targets.slice(0, 3).map((target) => (
+                                <button
+                                    key={target.id}
+                                    type="button"
+                                    onClick={() => setActiveTab("targets")}
+                                    className="flex items-center gap-3 rounded-2xl border border-border p-4 text-left transition hover:bg-zinc-50"
+                                >
+                                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-primary">
+                                        <HardDrive className="h-6 w-6" />
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate font-semibold">{target.name}</span>
+                                        <span className="block truncate text-sm text-muted-foreground">{target.configuration?.remote_path ?? target.type}</span>
+                                    </span>
+                                    <span className={target.enabled ? "status-pill bg-emerald-50 text-emerald-700" : "status-pill bg-zinc-100 text-muted-foreground"}>
+                                        {target.enabled ? "Enabled" : "Disabled"}
+                                    </span>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                </button>
+                            ))}
+                            {targets.length === 0 ? <p className="text-sm text-muted-foreground">No backup targets configured.</p> : null}
+                        </div>
+                    </div>
+
+                    <div className="apple-card rounded-2xl p-5">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">Recent Backups</h2>
+                            <button type="button" onClick={() => setActiveTab("history")} className="text-sm font-medium text-primary">View all</button>
+                        </div>
+                        <div className="divide-y divide-border">
+                            {sortedBackupRuns.slice(0, 5).map((run) => (
+                                <button
+                                    key={run.id}
+                                    type="button"
+                                    onClick={() => setActiveTab("history")}
+                                    className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-3 py-3 text-left text-sm transition hover:bg-zinc-50"
+                                >
+                                    <span>
+                                        <span className="block font-medium">{formatDate(run.started_at ?? run.created_at)}</span>
+                                        <span className="text-xs text-muted-foreground">{targetByID.get(run.target_id)?.name ?? "Unknown target"}</span>
+                                    </span>
+                                    <span className="text-muted-foreground">{formatBytes(run.size_bytes)}</span>
+                                    <StatusBadge status={run.status} />
+                                </button>
+                            ))}
+                            {sortedBackupRuns.length === 0 ? <p className="py-4 text-sm text-muted-foreground">No backup runs yet.</p> : null}
+                        </div>
+                    </div>
+                </section>
+
+                <section className="apple-card rounded-2xl p-5">
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(160px,0.35fr))] lg:items-center">
+                        <div>
+                            <h2 className="text-lg font-semibold">Ready to Restore</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">Restore from any completed backup with a stored backup identifier.</p>
+                            <Button variant="outline" className="mt-4" onClick={() => setActiveTab("restore")}>
+                                Open Restore Wizard
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <BackupSummary label="Available backups" value={`${completedRuns.length}`} detail="Across all targets" />
+                        <BackupSummary label="Oldest backup" value={completedRuns.length > 0 ? formatDate(completedRuns[completedRuns.length - 1].created_at) : "—"} detail="Completed runs" />
+                        <BackupSummary label="Total size" value={formatBytes(totalBackupSize)} detail="Across all backups" />
+                    </div>
+                </section>
+
+                <section className="space-y-4">
+                    <div className="apple-card flex w-full gap-1 overflow-x-auto rounded-2xl p-1 sm:w-auto">
                         {tabs.map((tab) => (
                             <Button
                                 key={tab.key}
@@ -395,11 +575,6 @@ export default function BackupsPage() {
                             </Button>
                         ))}
                     </div>
-                </div>
-
-                {error ? (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-                ) : null}
 
                 {activeTab === "targets" ? (
                     <TargetsTab
@@ -448,7 +623,7 @@ export default function BackupsPage() {
                     <RestoreTab
                         targets={targets}
                         targetByID={targetByID}
-                        completedRuns={backupRuns.filter((run) => run.status === "completed" && run.backup_path)}
+                        completedRuns={completedRuns}
                         restoreRuns={restoreRuns}
                         isLoading={restoreRunsQuery.isLoading}
                         manualTargetId={selectedManualRestoreTarget}
@@ -459,6 +634,7 @@ export default function BackupsPage() {
                         onRestoreFromRun={openRestoreFromRun}
                     />
                 ) : null}
+                </section>
             </div>
 
             <Dialog open={restoreRequest !== null} onOpenChange={(open) => !open && setRestoreRequest(null)}>
@@ -593,6 +769,50 @@ function TargetsTab({
                     secretMode="required"
                 />
             </Panel>
+        </div>
+    );
+}
+
+function BackupMetric({
+    icon: Icon,
+    label,
+    value,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    value: string;
+}) {
+    return (
+        <div className="flex items-start gap-3">
+            <Icon className="mt-0.5 h-4 w-4 text-primary" />
+            <div>
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="mt-1 font-semibold text-zinc-950">{value}</p>
+            </div>
+        </div>
+    );
+}
+
+function HealthLine({ ok, label }: { ok: boolean; label: string }) {
+    return (
+        <div className="flex items-center gap-3">
+            <span className={cn(
+                "flex h-5 w-5 items-center justify-center rounded-full",
+                ok ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700",
+            )}>
+                {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+            </span>
+            <span className="text-zinc-700">{label}</span>
+        </div>
+    );
+}
+
+function BackupSummary({ label, value, detail }: { label: string; value: string; detail: string }) {
+    return (
+        <div className="border-t border-border pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
         </div>
     );
 }
@@ -1137,7 +1357,7 @@ function RestoreRunsTable({ runs, targetByID, isLoading }: { runs: RestoreRun[];
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <section className="floating-window rounded-2xl p-3">
+        <section className="apple-card rounded-2xl p-4">
             <h2 className="mb-3 text-base font-semibold">{title}</h2>
             {children}
         </section>
@@ -1190,7 +1410,7 @@ function Progress({ value }: { value: number }) {
     const safeValue = Math.max(0, Math.min(100, value || 0));
     return (
         <div className="h-2 w-28 overflow-hidden rounded-full bg-zinc-200">
-            <div className="h-full rounded-full bg-zinc-950 transition-all" style={{ width: `${safeValue}%` }} />
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${safeValue}%` }} />
         </div>
     );
 }
@@ -1209,7 +1429,7 @@ function RowActions({ label, onEdit, onDelete }: { label: string; onEdit: () => 
 }
 
 function EmptyState({ children }: { children: React.ReactNode }) {
-    return <p className="rounded-xl bg-white/50 p-4 text-sm text-muted-foreground">{children}</p>;
+    return <p className="rounded-xl bg-zinc-50 p-4 text-sm text-muted-foreground">{children}</p>;
 }
 
 function buildTargetPayload(draft: TargetDraft) {

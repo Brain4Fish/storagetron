@@ -4,7 +4,7 @@ export function normalizeScanCode(value: string) {
     try {
         const url = new URL(code);
         const parts = url.pathname.split("/").filter(Boolean);
-        const scanIndex = parts.findIndex((part) => ["scan", "items", "kits"].includes(part));
+        const scanIndex = parts.findIndex((part) => ["scan", "items", "kits", "containers"].includes(part));
 
         if (scanIndex >= 0 && parts[scanIndex + 1]) {
             return decodeURIComponent(parts[scanIndex + 1]);

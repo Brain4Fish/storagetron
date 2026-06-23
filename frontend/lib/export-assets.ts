@@ -267,17 +267,17 @@ export function downloadInventoryRowsXlsx(
     return rows.length;
 }
 
-export async function downloadSelectedAssetsXlsx(itemIds: Iterable<string>, filename = "selected-assets.xlsx") {
+export async function downloadSelectedAssetsXlsx(itemIds: Iterable<string>, filename = "selected-items.xlsx") {
     const uniqueItemIds = Array.from(new Set(itemIds));
     if (uniqueItemIds.length === 0) {
-        throw new Error("Choose at least one asset to export.");
+        throw new Error("Choose at least one item to export.");
     }
 
     const results = await Promise.allSettled(uniqueItemIds.map((itemId) => api.getItem(itemId)));
     const items = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
 
     if (items.length === 0) {
-        throw new Error("Selected assets could not be loaded.");
+        throw new Error("Selected items could not be loaded.");
     }
 
     return downloadInventoryRowsXlsx(
@@ -291,24 +291,24 @@ export async function downloadSelectedAssetsXlsx(itemIds: Iterable<string>, file
     );
 }
 
-export async function downloadSelectedKitsXlsx(containerIds: Iterable<string>, filename = "selected-kits.xlsx") {
+export async function downloadSelectedKitsXlsx(containerIds: Iterable<string>, filename = "selected-containers.xlsx") {
     const uniqueContainerIds = Array.from(new Set(containerIds));
     if (uniqueContainerIds.length === 0) {
-        throw new Error("Choose at least one kit to export.");
+        throw new Error("Choose at least one container to export.");
     }
 
     const results = await Promise.allSettled(uniqueContainerIds.map((containerId) => api.getContainer(containerId)));
     const containers = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
 
     if (containers.length === 0) {
-        throw new Error("Selected kits could not be loaded.");
+        throw new Error("Selected containers could not be loaded.");
     }
 
     return downloadInventoryRowsXlsx(
         containers.map((container) => ({
             name: container.name,
             id: container.id,
-            link: `${window.location.origin}/kits/${container.id}`,
+            link: `${window.location.origin}/containers/${container.id}`,
             location: formatLocation(container.location),
         })),
         filename,

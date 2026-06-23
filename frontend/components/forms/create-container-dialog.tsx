@@ -44,7 +44,7 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
             onOpenChange(false);
         },
         onError: (err) => {
-            setError(err instanceof ApiError ? err.message : "Failed to create kit");
+            setError(err instanceof ApiError ? err.message : "Failed to create container");
         },
     });
 
@@ -64,7 +64,7 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Create kit</DialogTitle>
+                    <DialogTitle>Create container</DialogTitle>
                     <DialogDescription>Add a box, shelf, room, or other container.</DialogDescription>
                 </DialogHeader>
 
@@ -75,7 +75,7 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
                             id="container-name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            placeholder="Shelf A, Photo kit, Storage room"
+                            placeholder="Shelf A, Photo box, Storage room"
                         />
                     </div>
 
@@ -103,7 +103,7 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
                             Cancel
                         </Button>
                         <Button type="submit" disabled={mutation.isPending}>
-                            {mutation.isPending ? "Creating..." : "Create kit"}
+                            {mutation.isPending ? "Creating..." : "Create container"}
                         </Button>
                     </DialogFooter>
                 </form>
