@@ -118,4 +118,3 @@ Integration tests that require Postgres are skipped unless `TEST_DATABASE_URL` p
 
 - This project is intended for self-hosted trusted-network use today. Do not imply that public-internet deployment is safe until authentication and access control exist.
 - Existing screenshots under `docs/` are part of the README label-printing workflow; keep their relative links working.
-- The GitLab CI file contains private registry details. Do not present those as public release instructions in docs.
