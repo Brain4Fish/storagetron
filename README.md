@@ -296,7 +296,7 @@ npm run build
 npm run lint
 ```
 
-`npm run lint` uses `next lint`; availability can vary across Next.js versions.
+`npm run lint` uses the ESLint CLI with the Next.js preset.
 
 ### Repository Layout
 
@@ -367,6 +367,23 @@ Niimbot app doesn't allow to share design. Because of that I can just share my d
 - A Makefile or task runner for repeatable test, lint, and local bootstrap commands.
 - Direct label-printer integrations for NIIMBOT or similar devices.
 
+## CI
+
+GitHub Actions runs on self-hosted runners with the `k8s-runners` label.
+
+The main workflow is `.github/workflows/ci.yml`:
+
+- Pull requests into `main` run linter, tests, backend container build, frontend container build, and the aggregate `PR gate`. Pull requests do not push images.
+- Pushes to `main` run the same checks automatically, push `main` and `sha-*` images to GitHub Container Registry, and finish with `Main gate`.
+- Version tags matching `v*.*.*` build both images without pushing, wait for the `release` environment approval, then push release tags to GitHub Container Registry.
+
+Container builds use Docker Buildx on the dedicated `k8s-builder-runners` ARC scale set. Keep lint, test, and gate jobs on the regular `k8s-runners` label so only image builds use the builder runner pool.
+
+Published images:
+
+- `ghcr.io/<owner>/<repo>-api`
+- `ghcr.io/<owner>/<repo>-web`
+
 ## Contributing
 
 Contributions are welcome. For code changes, please keep the existing layered structure: HTTP handlers validate and translate requests, services hold business behavior, repositories own Postgres access, and storage/backup packages isolate external systems.
@@ -376,6 +393,7 @@ Before opening a pull request:
 ```bash
 go test ./...
 cd frontend
+npm run lint
 npm run test
 npm run build
 ```

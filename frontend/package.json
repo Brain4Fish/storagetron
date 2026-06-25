@@ -6,7 +6,7 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "tsc -p tsconfig.test.json && NODE_PATH=./node_modules node --test /tmp/storagetron-frontend-test-dist/tests/*.test.js"
   },
   "dependencies": {
@@ -18,17 +18,20 @@
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.469.0",
     "next": "^15.5.15",
+    "qrcode": "1.5.4",
+    "qrcode.react": "4.2.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "tailwind-merge": "^2.5.4",
-    "qrcode.react": "4.2.0",
-    "qrcode": "1.5.4"
+    "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^15.5.19",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3"

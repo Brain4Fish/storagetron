@@ -1,0 +1,349 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# TODO: uncomment this after merge https://github.com/Brain4Fish/storagetron/pull/1
+# because job stuck in queued state
+#concurrency:
+#  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+#  cancel-in-progress: true
+
+env:
+  GOFLAGS: -mod=readonly
+  NODE_VERSION: "22"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  lint:
+    name: Linter
+    runs-on: k8s-runners
+    env:
+      GOCACHE: ${{ github.workspace }}/.cache/go-build
+      GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check Go formatting
+        shell: bash
+        run: |
+          gofmt -l $(git ls-files '*.go') > /tmp/gofmt.out
+          if [ -s /tmp/gofmt.out ]; then
+            echo "The following Go files need gofmt:"
+            cat /tmp/gofmt.out
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend linter
+        working-directory: frontend
+        run: npm run lint
+
+  test:
+    name: Tests
+    runs-on: k8s-runners
+    env:
+      GOCACHE: ${{ github.workspace }}/.cache/go-build
+      GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run backend tests
+        run: go test ./...
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm run test
+
+  build-backend-image:
+    name: Build backend image
+    runs-on: k8s-builder-runners
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set image name
+        id: image-name
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}-api" >> "$GITHUB_OUTPUT"
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-name.outputs.name }}
+          tags: |
+            type=ref,event=pr
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=tag
+            type=sha,prefix=sha-
+
+      - name: Login to GHCR
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
+            APP_COMMIT=${{ github.sha }}
+            APP_BUILD_DATE=${{ github.event.head_commit.timestamp || 'unknown' }}
+
+  build-frontend-image:
+    name: Build frontend image
+    runs-on: k8s-builder-runners
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set image name
+        id: image-name
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}-web" >> "$GITHUB_OUTPUT"
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-name.outputs.name }}
+          tags: |
+            type=ref,event=pr
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=tag
+            type=sha,prefix=sha-
+
+      - name: Login to GHCR
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            WEB_VERSION=${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
+            WEB_COMMIT=${{ github.sha }}
+            API_PROXY_TARGET=http://localhost:8086
+
+  pr-gate:
+    name: PR gate
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs:
+      - lint
+      - test
+      - build-backend-image
+      - build-frontend-image
+    runs-on: k8s-runners
+    timeout-minutes: 5
+    steps:
+      - name: Check PR gate
+        shell: bash
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more required jobs failed or were cancelled."
+            exit 1
+          fi
+          echo "PR gate passed."
+
+  main-gate:
+    name: Main gate
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs:
+      - lint
+      - test
+      - build-backend-image
+      - build-frontend-image
+    runs-on: k8s-runners
+    timeout-minutes: 5
+    steps:
+      - name: Check main gate
+        shell: bash
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more required jobs failed or were cancelled."
+            exit 1
+          fi
+          echo "Main gate passed."
+
+  release-checks:
+    name: Release checks
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))) }}
+    needs:
+      - lint
+      - test
+      - build-backend-image
+      - build-frontend-image
+    runs-on: k8s-runners
+    timeout-minutes: 5
+    steps:
+      - name: Validate release checks
+        shell: bash
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more required jobs failed or were cancelled."
+            exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ] && [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tags must look like v1.2.3 or v1.2.3-rc.1."
+            exit 1
+          fi
+          echo "Release checks passed."
+
+  release-gate:
+    name: Release gate
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) }}
+    needs:
+      - release-checks
+    runs-on: k8s-runners
+    timeout-minutes: 5
+    environment:
+      name: release
+    steps:
+      - name: Confirm release approval
+        run: echo "Release gate approved."
+
+  publish-release-images:
+    name: Publish release images
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    needs:
+      - release-gate
+    runs-on: k8s-builder-runners
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            context: .
+            file: Dockerfile
+            build-args: |
+              APP_VERSION=${{ github.ref_name }}
+              APP_COMMIT=${{ github.sha }}
+              APP_BUILD_DATE=${{ github.event.head_commit.timestamp || 'unknown' }}
+          - name: web
+            context: frontend
+            file: frontend/Dockerfile
+            build-args: |
+              WEB_VERSION=${{ github.ref_name }}
+              WEB_COMMIT=${{ github.sha }}
+              API_PROXY_TARGET=http://localhost:8086
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set image name
+        id: image-name
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}-${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-name.outputs.name }}
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix=sha-
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ${{ matrix.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build-args }}

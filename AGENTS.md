@@ -99,7 +99,7 @@ npm run build
 npm run lint
 ```
 
-`npm run lint` uses `next lint`; availability can depend on the installed Next.js version. If it fails because the command is unavailable, report that clearly instead of treating it as an application failure.
+`npm run lint` uses the ESLint CLI with the Next.js preset.
 
 Integration tests that require Postgres are skipped unless `TEST_DATABASE_URL` points to a disposable database. Do not point integration tests at a database with valuable data.
 
