@@ -20,9 +20,11 @@ permissions:
   contents: read
   packages: write
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+# TODO: uncomment this after merge https://github.com/Brain4Fish/storagetron/pull/1
+# because job stuck in queued state
+#concurrency:
+#  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+#  cancel-in-progress: true
 
 env:
   GOFLAGS: -mod=readonly
