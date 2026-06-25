@@ -54,7 +54,7 @@ helm upgrade --install storagetron charts/storagetron \
 
 ## Ingress
 
-Ingress paths target either `web` or `api`; ports default to `web.service.port` and `api.service.port`.
+Ingress paths commonly target `web`, `api`, or `minio`. Ports default to `web.service.port`, `api.service.port`, or `minio.service.apiPort`. Other service suffixes are allowed when `port` is set explicitly.
 
 ```yaml
 ingress:
