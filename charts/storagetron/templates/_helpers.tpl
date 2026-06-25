@@ -111,8 +111,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "storagetron.apiName" $root -}}
 {{- else if eq $path.service "web" -}}
 {{- include "storagetron.webName" $root -}}
+{{- else if eq $path.service "minio" -}}
+{{- include "storagetron.minioName" $root -}}
 {{- else -}}
-{{- fail (printf "ingress path service must be one of api or web, got %q" $path.service) -}}
+{{- printf "%s-%s" (include "storagetron.fullname" $root) $path.service | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 {{- end -}}
 
@@ -125,7 +127,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $root.Values.api.service.port -}}
 {{- else if eq $path.service "web" -}}
 {{- $root.Values.web.service.port -}}
+{{- else if eq $path.service "minio" -}}
+{{- $root.Values.minio.service.apiPort -}}
 {{- else -}}
-{{- fail (printf "ingress path service must be one of api or web, got %q" $path.service) -}}
+{{- fail (printf "ingress path service %q requires an explicit port" $path.service) -}}
 {{- end -}}
 {{- end -}}
