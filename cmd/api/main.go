@@ -50,6 +50,7 @@ func main() {
 	itemRepo := repository.NewItemRepo(dbConn)
 	containerRepo := repository.NewContainerRepo(dbConn)
 	locationRepo := repository.NewLocationRepo(dbConn)
+	labelRepo := repository.NewLabelRepo(dbConn)
 	photoRepo := repository.NewPhotoRepo(dbConn)
 	backupRepo := backupstore.NewPostgres(dbConn)
 
@@ -57,6 +58,7 @@ func main() {
 	itemSvc := service.NewItemService(itemRepo, photoSvc)
 	containerSvc := service.NewContainerService(containerRepo, photoSvc)
 	locationSvc := service.NewLocationService(locationRepo)
+	labelSvc := service.NewLabelService(labelRepo)
 	backupSecrets, err := backupcore.NewSecretBox(cfg.BackupSecretKey)
 	if err != nil {
 		logger.Fatal("backup secret initialization failed", zap.Error(err))
@@ -96,6 +98,7 @@ func main() {
 	itemHandler := handler.NewItemHandler(itemSvc, logger)
 	containerHandler := handler.NewContainerHandler(containerSvc, logger)
 	locationHandler := handler.NewLocationHandler(locationSvc, logger)
+	labelHandler := handler.NewLabelHandler(labelSvc, logger)
 	photoHandler := handler.NewPhotoHandler(photoSvc, logger)
 	scanHandler := handler.NewScanHandler(itemSvc, containerSvc, logger)
 
@@ -103,7 +106,7 @@ func main() {
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
 		MaxAge:         300,
 	}))
@@ -123,6 +126,8 @@ func main() {
 			r.Get("/{id}", itemHandler.Get)
 			r.Patch("/{id}", itemHandler.Update)
 			r.Delete("/{id}", itemHandler.Delete)
+			r.Put("/{id}/labels/{label_id}", itemHandler.AttachLabel)
+			r.Delete("/{id}/labels/{label_id}", itemHandler.DetachLabel)
 			r.Post("/{id}/photos", photoHandler.Upload)
 			r.Delete("/{id}/photos/{photo_id}", photoHandler.DeleteItemPhoto)
 		})
@@ -133,6 +138,8 @@ func main() {
 			r.Get("/{id}", containerHandler.Get)
 			r.Patch("/{id}", containerHandler.Update)
 			r.Delete("/{id}", containerHandler.Delete)
+			r.Put("/{id}/labels/{label_id}", containerHandler.AttachLabel)
+			r.Delete("/{id}/labels/{label_id}", containerHandler.DetachLabel)
 			r.Post("/{id}/items", containerHandler.AddItem)
 			r.Delete("/{id}/items/{item_id}", containerHandler.RemoveItem)
 			r.Post("/{id}/photos", photoHandler.UploadContainer)
@@ -145,6 +152,11 @@ func main() {
 			r.Patch("/{id}", locationHandler.Update)
 			r.Delete("/{id}", locationHandler.Delete)
 		})
+
+		r.Get("/labels", labelHandler.List)
+		r.Post("/labels", labelHandler.Create)
+		r.Patch("/labels/{id}", labelHandler.Update)
+		r.Delete("/labels/{id}", labelHandler.Delete)
 
 		r.Get("/scan/{code}", scanHandler.Scan)
 		r.Route("/backup", backupHandler.Routes)

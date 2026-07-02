@@ -163,7 +163,7 @@ func (r *fakePhotoRepository) DeleteByItemID(_ context.Context, itemID, photoID 
 	return r.deletedItemPhoto, r.deleteItemErr
 }
 
-func (r *fakePhotoRepository) GetLabelByItemID(context.Context, uuid.UUID) (*model.Label, error) {
+func (r *fakePhotoRepository) GetLabelByItemID(context.Context, uuid.UUID) (*model.ScanLabel, error) {
 	return nil, nil
 }
 

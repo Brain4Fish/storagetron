@@ -8,7 +8,7 @@ import {
     MapPin,
     Package,
     Plus,
-    Printer,
+    Tags,
     QrCode,
     Search,
 } from "lucide-react";
@@ -163,7 +163,7 @@ export default function HomePage() {
                         <div className="mt-4 grid gap-2">
                             <QuickAction href="/scan" icon={QrCode} label="Scan QR Code" />
                             <QuickAction href="/items" icon={Plus} label="Add New Item" />
-                            <QuickAction href="/print/items" icon={Printer} label="Print Labels" />
+                            <QuickAction href="/labels" icon={Tags} label="Manage Labels" />
                             <QuickAction href="/locations" icon={MapPin} label="Add New Location" />
                         </div>
                     </div>

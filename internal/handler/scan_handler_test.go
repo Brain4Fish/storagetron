@@ -19,7 +19,7 @@ import (
 
 func TestScanReturnsItemForLabelCode(t *testing.T) {
 	itemID := uuid.New()
-	label := &model.Label{Code: "ITEM-001", ItemID: &itemID}
+	label := &model.ScanLabel{Code: "ITEM-001", ItemID: &itemID}
 	handler := newTestScanHandler(
 		&scanItemRepo{
 			itemByCode: model.Item{ID: itemID, Name: "Laptop"},
@@ -41,7 +41,7 @@ func TestScanReturnsItemForLabelCode(t *testing.T) {
 
 func TestScanFallsBackToContainerLabelWhenItemCodeNotFound(t *testing.T) {
 	containerID := uuid.New()
-	label := &model.Label{Code: "BOX-007", ContainerID: &containerID}
+	label := &model.ScanLabel{Code: "BOX-007", ContainerID: &containerID}
 	handler := newTestScanHandler(
 		&scanItemRepo{itemByCodeErr: pgx.ErrNoRows},
 		&scanContainerRepo{
@@ -126,7 +126,7 @@ func scanRequest(code string) *http.Request {
 type scanItemRepo struct {
 	itemByCode    model.Item
 	itemByCodeErr error
-	label         *model.Label
+	label         *model.ScanLabel
 	labelErr      error
 	item          model.Item
 	itemErr       error
@@ -160,14 +160,17 @@ func (r *scanItemRepo) GetByLabelCode(context.Context, string) (model.Item, erro
 	return r.itemByCode, r.itemByCodeErr
 }
 
-func (r *scanItemRepo) GetLabelByCode(context.Context, string) (*model.Label, error) {
+func (r *scanItemRepo) AttachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+func (r *scanItemRepo) DetachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+
+func (r *scanItemRepo) GetLabelByCode(context.Context, string) (*model.ScanLabel, error) {
 	return r.label, r.labelErr
 }
 
 type scanContainerRepo struct {
 	containerByCode    model.Container
 	containerByCodeErr error
-	label              *model.Label
+	label              *model.ScanLabel
 	labelErr           error
 	container          model.Container
 	containerErr       error
@@ -201,15 +204,18 @@ func (r *scanContainerRepo) RemoveItem(context.Context, uuid.UUID, uuid.UUID) er
 	return nil
 }
 
+func (r *scanContainerRepo) AttachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+func (r *scanContainerRepo) DetachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+
 func (r *scanContainerRepo) GetByLabelCode(context.Context, string) (model.Container, error) {
 	return r.containerByCode, r.containerByCodeErr
 }
 
-func (r *scanContainerRepo) GetLabelByContainerID(context.Context, uuid.UUID) (*model.Label, error) {
+func (r *scanContainerRepo) GetLabelByContainerID(context.Context, uuid.UUID) (*model.ScanLabel, error) {
 	return nil, nil
 }
 
-func (r *scanContainerRepo) GetLabelByCode(context.Context, string) (*model.Label, error) {
+func (r *scanContainerRepo) GetLabelByCode(context.Context, string) (*model.ScanLabel, error) {
 	return r.label, r.labelErr
 }
 
@@ -243,7 +249,7 @@ func (r *scanPhotoRepo) DeleteByItemID(context.Context, uuid.UUID, uuid.UUID) (m
 	return model.Photo{}, nil
 }
 
-func (r *scanPhotoRepo) GetLabelByItemID(context.Context, uuid.UUID) (*model.Label, error) {
+func (r *scanPhotoRepo) GetLabelByItemID(context.Context, uuid.UUID) (*model.ScanLabel, error) {
 	return nil, nil
 }
 

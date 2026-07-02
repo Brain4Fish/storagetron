@@ -15,6 +15,7 @@ type Item struct {
 	InheritedLocation *Location  `json:"inherited_location,omitempty"`
 	CreatedAt         time.Time  `json:"created_at"`
 	Photos            []Photo    `json:"photos"`
+	Labels            []Label    `json:"labels"`
 }
 
 type ItemListResponse struct {
@@ -25,15 +26,17 @@ type ItemListResponse struct {
 }
 
 type Container struct {
-	ID          uuid.UUID  `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description,omitempty"`
-	LocationID  *uuid.UUID `json:"location_id,omitempty"`
-	Location    *Location  `json:"location,omitempty"`
-	CreatedAt   time.Time  `json:"created_at,omitempty"`
-	Items       []Item     `json:"items,omitempty"`
-	ItemsCount  int        `json:"items_count,omitempty"`
-	Photos      []Photo    `json:"photos,omitempty"`
+	ID              uuid.UUID  `json:"id"`
+	Name            string     `json:"name"`
+	Description     string     `json:"description,omitempty"`
+	LocationID      *uuid.UUID `json:"location_id,omitempty"`
+	Location        *Location  `json:"location,omitempty"`
+	CreatedAt       time.Time  `json:"created_at,omitempty"`
+	Items           []Item     `json:"items,omitempty"`
+	ItemsCount      int        `json:"items_count,omitempty"`
+	Photos          []Photo    `json:"photos,omitempty"`
+	Labels          []Label    `json:"labels"`
+	InheritedLabels []Label    `json:"inherited_labels"`
 }
 
 type Location struct {
@@ -70,11 +73,29 @@ type Photo struct {
 	URL         string     `json:"url"`
 }
 
-type Label struct {
+type ScanLabel struct {
 	Code        string     `json:"code"`
 	ItemID      *uuid.UUID `json:"item_id,omitempty"`
 	ContainerID *uuid.UUID `json:"container_id,omitempty"`
 	CreatedAt   time.Time  `json:"created_at,omitempty"`
+}
+
+type Label struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Color     string    `json:"color"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type CreateLabelRequest struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+type UpdateLabelRequest struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
 }
 
 type AddItemToContainerRequest struct {
@@ -123,5 +144,5 @@ type ScanResult struct {
 	Item      *Item      `json:"item,omitempty"`
 	Container *Container `json:"container,omitempty"`
 	Photos    []Photo    `json:"photos,omitempty"`
-	Label     *Label     `json:"label,omitempty"`
+	Label     *ScanLabel `json:"label,omitempty"`
 }

@@ -207,3 +207,41 @@ func (h *ContainerHandler) RemoveItem(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *ContainerHandler) AttachLabel(w http.ResponseWriter, r *http.Request) {
+	containerID, labelID, ok := inventoryLabelIDs(w, r, "container")
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := h.svc.AttachLabel(ctx, containerID, labelID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondErr(w, http.StatusNotFound, "container or label not found")
+			return
+		}
+		h.logger.Error("attach container label failed", zap.Error(err))
+		respondErr(w, http.StatusInternalServerError, "failed to attach label")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ContainerHandler) DetachLabel(w http.ResponseWriter, r *http.Request) {
+	containerID, labelID, ok := inventoryLabelIDs(w, r, "container")
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := h.svc.DetachLabel(ctx, containerID, labelID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondErr(w, http.StatusNotFound, "container or label not found")
+			return
+		}
+		h.logger.Error("detach container label failed", zap.Error(err))
+		respondErr(w, http.StatusInternalServerError, "failed to detach label")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

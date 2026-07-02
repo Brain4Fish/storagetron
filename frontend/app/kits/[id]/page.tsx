@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { PrintLabelDialog } from "@/components/print-label-dialog";
 import { EditRecordDialog } from "@/components/forms/edit-record-dialog";
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
+import { LabelList } from "@/components/labels/label-chip";
+import { labelSelectionDiff } from "@/lib/labels";
 
 export default function KitDetailsPage() {
     const params = useParams();
@@ -57,6 +59,7 @@ export default function KitDetailsPage() {
         queryKey: ["locations"],
         queryFn: api.listLocations,
     });
+    const { data: labels = [] } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels });
 
     const kitItems = useMemo(() => {
         const containerItems = containerQuery.data?.items ?? [];
@@ -69,6 +72,7 @@ export default function KitDetailsPage() {
         [kitItems, selectedItemIds],
     );
     const selectedCount = selectedItemIds.size;
+    const selectedLabelIds = useMemo(() => (containerQuery.data?.labels ?? []).map((label) => label.id), [containerQuery.data?.labels]);
 
     const availableItems = useMemo(() => {
         const assignedItems = new Set(
@@ -96,7 +100,16 @@ export default function KitDetailsPage() {
     });
 
     const updateMutation = useMutation({
-        mutationFn: (payload: { name: string; description: string; location_id?: string | null }) => api.updateContainer(id, payload),
+        mutationFn: async (payload: { name: string; description: string; location_id?: string | null; label_ids?: string[] }) => {
+            const { label_ids = [], ...record } = payload;
+            await api.updateContainer(id, record);
+            const diff = labelSelectionDiff(containerQuery.data?.labels ?? [], label_ids);
+            const results = await Promise.allSettled([
+                ...diff.attach.map((labelId) => api.attachContainerLabel(id, labelId)),
+                ...diff.detach.map((labelId) => api.detachContainerLabel(id, labelId)),
+            ]);
+            if (results.some((result) => result.status === "rejected")) throw new Error("Container details were saved, but some label changes failed. Try saving again.");
+        },
         onSuccess: async () => {
             setEditError("");
             setEditOpen(false);
@@ -105,8 +118,13 @@ export default function KitDetailsPage() {
                 queryClient.invalidateQueries({ queryKey: ["containers"] }),
             ]);
         },
-        onError: (err) => {
-            setEditError(err instanceof ApiError ? err.message : "Failed to update container");
+        onError: (err) => setEditError(err instanceof Error ? err.message : "Failed to update container"),
+        onSettled: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["container", id] }),
+                queryClient.invalidateQueries({ queryKey: ["containers"] }),
+                queryClient.invalidateQueries({ queryKey: ["items"] }),
+            ]);
         },
     });
 
@@ -344,6 +362,18 @@ export default function KitDetailsPage() {
                                         <span className="status-pill bg-indigo-50 text-primary">Container</span>
                                         <span className="status-pill bg-emerald-50 text-emerald-700">{kitItems.length} items</span>
                                     </div>
+                                    <div className="mt-4 space-y-3">
+                                        <div>
+                                            <p className="mb-2 text-sm font-medium">Labels</p>
+                                            <LabelList labels={container.labels} empty="No direct labels" />
+                                        </div>
+                                        {(container.inherited_labels ?? []).length > 0 ? (
+                                            <div>
+                                                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Inherited from items</p>
+                                                <LabelList labels={container.inherited_labels} inherited />
+                                            </div>
+                                        ) : null}
+                                    </div>
                                     <div className="mt-6 grid gap-4 border-y border-border py-5 sm:grid-cols-2">
                                         <div className="flex items-start gap-3">
                                             <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
@@ -438,7 +468,7 @@ export default function KitDetailsPage() {
 
                     <aside className="space-y-4">
                     <section className="apple-card rounded-2xl p-5">
-                        <h2 className="mb-4 text-lg font-semibold">Container Label</h2>
+                        <h2 className="mb-4 text-lg font-semibold">QR Code</h2>
                         <div className="flex flex-col items-center gap-4">
                             <div className="rounded-2xl border border-border bg-white p-4">
                                 <QRCode value={kitUrl} />
@@ -511,6 +541,8 @@ export default function KitDetailsPage() {
                 details={container.description}
                 locationId={container.location_id ?? ""}
                 locations={locations}
+                labels={labels}
+                selectedLabelIds={selectedLabelIds}
                 isSaving={updateMutation.isPending}
                 error={editError}
                 onOpenChange={setEditOpen}

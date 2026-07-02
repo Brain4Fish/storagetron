@@ -19,7 +19,7 @@ type PhotoRepository interface {
 	ContainerExists(context.Context, uuid.UUID) error
 	DeleteByContainerID(context.Context, uuid.UUID, uuid.UUID) (model.Photo, error)
 	DeleteByItemID(context.Context, uuid.UUID, uuid.UUID) (model.Photo, error)
-	GetLabelByItemID(context.Context, uuid.UUID) (*model.Label, error)
+	GetLabelByItemID(context.Context, uuid.UUID) (*model.ScanLabel, error)
 }
 
 type PresignStorage interface {

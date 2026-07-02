@@ -193,3 +193,55 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *ItemHandler) AttachLabel(w http.ResponseWriter, r *http.Request) {
+	itemID, labelID, ok := inventoryLabelIDs(w, r, "item")
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := h.svc.AttachLabel(ctx, itemID, labelID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondErr(w, http.StatusNotFound, "item or label not found")
+			return
+		}
+		h.logger.Error("attach item label failed", zap.Error(err))
+		respondErr(w, http.StatusInternalServerError, "failed to attach label")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ItemHandler) DetachLabel(w http.ResponseWriter, r *http.Request) {
+	itemID, labelID, ok := inventoryLabelIDs(w, r, "item")
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := h.svc.DetachLabel(ctx, itemID, labelID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			respondErr(w, http.StatusNotFound, "item or label not found")
+			return
+		}
+		h.logger.Error("detach item label failed", zap.Error(err))
+		respondErr(w, http.StatusInternalServerError, "failed to detach label")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func inventoryLabelIDs(w http.ResponseWriter, r *http.Request, target string) (uuid.UUID, uuid.UUID, bool) {
+	targetID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondErr(w, http.StatusBadRequest, "invalid "+target+" id")
+		return uuid.Nil, uuid.Nil, false
+	}
+	labelID, err := uuid.Parse(chi.URLParam(r, "label_id"))
+	if err != nil {
+		respondErr(w, http.StatusBadRequest, "invalid label id")
+		return uuid.Nil, uuid.Nil, false
+	}
+	return targetID, labelID, true
+}

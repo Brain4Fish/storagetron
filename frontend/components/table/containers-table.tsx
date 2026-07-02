@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/utils";
 import { containerItemCount } from "@/lib/inventory-view";
 import { Button } from "@/components/ui/button";
 import { ImagePreview } from "@/components/image-preview";
+import { LabelList } from "@/components/labels/label-chip";
 
 type ContainersTableProps = {
     containers: Container[];
@@ -86,6 +87,10 @@ export function ContainersTable({
                                 {container.description ? (
                                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{container.description}</p>
                                 ) : null}
+                                <div className="mt-2 space-y-1.5">
+                                    <LabelList labels={container.labels} />
+                                    <LabelList labels={container.inherited_labels} inherited />
+                                </div>
                                 <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                                     <div className="flex items-center gap-2">
                                         <Box className="h-4 w-4" />
@@ -126,6 +131,7 @@ export function ContainersTable({
                             <th className="px-4 py-3 text-left">Container</th>
                             <th className="px-4 py-3 text-left">Location</th>
                             <th className="px-4 py-3 text-left">Items</th>
+                            <th className="px-4 py-3 text-left">Labels</th>
                             <th className="px-4 py-3 text-left">Created</th>
                             <th className="w-24 px-4 py-3 text-right">Actions</th>
                         </tr>
@@ -178,6 +184,12 @@ export function ContainersTable({
                                     <span className="status-pill bg-indigo-50 text-primary">
                                         {containerItemCount(container)} items
                                     </span>
+                                </td>
+                                <td className="max-w-72 px-4 py-3">
+                                    <div className="space-y-1.5">
+                                        <LabelList labels={container.labels} empty={(container.inherited_labels ?? []).length ? undefined : "—"} />
+                                        <LabelList labels={container.inherited_labels} inherited />
+                                    </div>
                                 </td>
                                 <td className="px-4 py-3 text-muted-foreground">{formatDate(container.created_at)}</td>
                                 <td className="px-4 py-3 text-right">

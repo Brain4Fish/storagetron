@@ -41,6 +41,7 @@ export function buildItemRows(items: Item[], containers: Container[]): ItemRowVi
                 item.id,
                 locationLabel,
                 containerLabel,
+                ...(item.labels ?? []).map((label) => label.name),
             ].filter(Boolean).join(" ").toLowerCase(),
         };
     });

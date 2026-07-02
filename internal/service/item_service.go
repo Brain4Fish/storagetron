@@ -15,8 +15,10 @@ type ItemRepo interface {
 	Get(context.Context, uuid.UUID) (model.Item, error)
 	Update(context.Context, uuid.UUID, model.UpdateItemRequest) error
 	Delete(context.Context, uuid.UUID) error
+	AttachLabel(context.Context, uuid.UUID, uuid.UUID) error
+	DetachLabel(context.Context, uuid.UUID, uuid.UUID) error
 	GetByLabelCode(context.Context, string) (model.Item, error)
-	GetLabelByCode(context.Context, string) (*model.Label, error)
+	GetLabelByCode(context.Context, string) (*model.ScanLabel, error)
 }
 
 type ItemService struct {
@@ -126,9 +128,29 @@ func (s *ItemService) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (s *ItemService) GetByCode(ctx context.Context, code string) (model.Item, error) {
-	return s.repo.GetByLabelCode(ctx, code)
+	item, err := s.repo.GetByLabelCode(ctx, code)
+	if err != nil {
+		return model.Item{}, err
+	}
+	if s.photoSvc == nil {
+		return item, nil
+	}
+	photos, err := s.photoSvc.ListByItemID(ctx, item.ID)
+	if err != nil {
+		return model.Item{}, err
+	}
+	item.Photos = photos
+	return item, nil
 }
 
-func (s *ItemService) GetLabelByCode(ctx context.Context, code string) (*model.Label, error) {
+func (s *ItemService) GetLabelByCode(ctx context.Context, code string) (*model.ScanLabel, error) {
 	return s.repo.GetLabelByCode(ctx, code)
+}
+
+func (s *ItemService) AttachLabel(ctx context.Context, itemID, labelID uuid.UUID) error {
+	return s.repo.AttachLabel(ctx, itemID, labelID)
+}
+
+func (s *ItemService) DetachLabel(ctx context.Context, itemID, labelID uuid.UUID) error {
+	return s.repo.DetachLabel(ctx, itemID, labelID)
 }
