@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Location } from "@/lib/api";
+import { InventoryLabel, Location } from "@/lib/api";
 import { LocationSelect } from "@/components/forms/location-select";
+import { LabelPicker } from "@/components/labels/label-picker";
 
 type Props = {
     open: boolean;
@@ -24,10 +25,12 @@ type Props = {
     details?: string;
     locationId?: string;
     locations?: Location[];
+    labels?: InventoryLabel[];
+    selectedLabelIds?: string[];
     isSaving?: boolean;
     error?: string;
     onOpenChange: (open: boolean) => void;
-    onSave: (data: { name: string; description: string; location_id?: string | null }) => void;
+    onSave: (data: { name: string; description: string; location_id?: string | null; label_ids?: string[] }) => void;
 };
 
 export function EditRecordDialog({
@@ -38,6 +41,8 @@ export function EditRecordDialog({
     details = "",
     locationId = "",
     locations,
+    labels,
+    selectedLabelIds = [],
     isSaving,
     error,
     onOpenChange,
@@ -47,6 +52,7 @@ export function EditRecordDialog({
     const [draftDescription, setDraftDescription] = useState(details);
     const [draftLocationId, setDraftLocationId] = useState(locationId);
     const [localError, setLocalError] = useState("");
+    const [draftLabelIds, setDraftLabelIds] = useState(selectedLabelIds);
 
     useEffect(() => {
         if (open) {
@@ -54,8 +60,9 @@ export function EditRecordDialog({
             setDraftDescription(details);
             setDraftLocationId(locationId);
             setLocalError("");
+            setDraftLabelIds(selectedLabelIds);
         }
-    }, [details, locationId, name, open]);
+    }, [details, locationId, name, open, selectedLabelIds]);
 
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -70,6 +77,7 @@ export function EditRecordDialog({
             name: draftName.trim(),
             description: draftDescription.trim(),
             ...(locations ? { location_id: draftLocationId || null } : {}),
+            ...(labels ? { label_ids: draftLabelIds } : {}),
         });
     };
 
@@ -107,6 +115,13 @@ export function EditRecordDialog({
                             value={draftLocationId}
                             onChange={setDraftLocationId}
                         />
+                    ) : null}
+
+                    {labels ? (
+                        <div className="space-y-2">
+                            <Label>Labels</Label>
+                            <LabelPicker labels={labels} selectedIds={draftLabelIds} onChange={setDraftLabelIds} />
+                        </div>
                     ) : null}
 
                     {localError || error ? (

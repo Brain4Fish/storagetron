@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Brain4Fish/storagetron/internal/service"
 	"github.com/Brain4Fish/storagetron/pkg/model"
 
 	"github.com/go-chi/chi/v5"
@@ -18,25 +17,23 @@ import (
 
 type scanItemService interface {
 	GetByCode(context.Context, string) (model.Item, error)
-	GetLabel(context.Context, string) (*model.Label, error)
+	GetLabelByCode(context.Context, string) (*model.ScanLabel, error)
+	Get(context.Context, uuid.UUID) (model.Item, error)
 }
 
 type scanContainerService interface {
 	GetByCode(context.Context, string) (model.Container, error)
-	GetLabel(context.Context, string) (*model.Label, error)
-}
-
-type scanPhotoService interface {
-	ListByItemID(context.Context, string) ([]model.Photo, error)
+	GetLabelByCode(context.Context, string) (*model.ScanLabel, error)
+	Get(context.Context, uuid.UUID) (model.Container, error)
 }
 
 type ScanHandler struct {
-	itemSvc      *service.ItemService
-	containerSvc *service.ContainerService
+	itemSvc      scanItemService
+	containerSvc scanContainerService
 	logger       *zap.Logger
 }
 
-func NewScanHandler(itemSvc *service.ItemService, containerSvc *service.ContainerService, logger *zap.Logger) *ScanHandler {
+func NewScanHandler(itemSvc scanItemService, containerSvc scanContainerService, logger *zap.Logger) *ScanHandler {
 	return &ScanHandler{
 		itemSvc:      itemSvc,
 		containerSvc: containerSvc,

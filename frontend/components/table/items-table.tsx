@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/utils";
 import { ItemRowView, itemStatusLabel } from "@/lib/inventory-view";
 import { Button } from "@/components/ui/button";
 import { ImagePreview } from "@/components/image-preview";
+import { LabelList } from "@/components/labels/label-chip";
 
 type ItemsTableProps = {
     rows: ItemRowView[];
@@ -67,6 +68,7 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                 {row.item.description ? (
                                     <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{row.item.description}</p>
                                 ) : null}
+                                <div className="mt-2"><LabelList labels={row.item.labels} /></div>
                                 <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                                     <div className="flex min-w-0 items-center gap-2">
                                         <Building2 className="h-4 w-4 shrink-0" />
@@ -116,6 +118,7 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                 <th className="px-4 py-3 text-left">Item</th>
                                 <th className="px-4 py-3 text-left">Location</th>
                                 <th className="px-4 py-3 text-left">Container</th>
+                                <th className="px-4 py-3 text-left">Labels</th>
                                 <th className="px-4 py-3 text-left">Status</th>
                                 <th className="px-4 py-3 text-left">Added</th>
                                 <th className="w-24 px-4 py-3 text-right">Actions</th>
@@ -166,6 +169,7 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                             <span className="text-muted-foreground">{row.containerLabel}</span>
                                         )}
                                     </td>
+                                    <td className="max-w-64 px-4 py-3"><LabelList labels={row.item.labels} empty="—" /></td>
                                     <td className="px-4 py-3">
                                         <span className={statusClass(row.status)}>{itemStatusLabel(row.status)}</span>
                                     </td>

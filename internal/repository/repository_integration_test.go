@@ -104,6 +104,51 @@ func TestRepositoryIntegrationPhotoCreateListAndDelete(t *testing.T) {
 	require.Empty(t, photos)
 }
 
+func TestRepositoryIntegrationReusableLabelsAndInheritance(t *testing.T) {
+	pool := repositoryIntegrationPool(t)
+	ctx := context.Background()
+	itemRepo := NewItemRepo(pool)
+	containerRepo := NewContainerRepo(pool)
+	labelRepo := NewLabelRepo(pool)
+
+	itemID := uuid.New()
+	containerID := uuid.New()
+	require.NoError(t, itemRepo.Create(ctx, model.Item{ID: itemID, Name: "Camera"}, "SCAN-CAMERA"))
+	require.NoError(t, containerRepo.Create(ctx, model.Container{ID: containerID, Name: "Gear box"}, "SCAN-BOX"))
+	require.NoError(t, containerRepo.AddItem(ctx, containerID, itemID))
+
+	label, err := labelRepo.Create(ctx, model.Label{ID: uuid.New(), Name: "Electronics", Color: "blue"})
+	require.NoError(t, err)
+	require.NoError(t, itemRepo.AttachLabel(ctx, itemID, label.ID))
+	require.NoError(t, itemRepo.AttachLabel(ctx, itemID, label.ID))
+
+	item, err := itemRepo.Get(ctx, itemID)
+	require.NoError(t, err)
+	require.Len(t, item.Labels, 1)
+
+	container, err := containerRepo.Get(ctx, containerID)
+	require.NoError(t, err)
+	require.Empty(t, container.Labels)
+	require.Len(t, container.InheritedLabels, 1)
+	require.Len(t, container.Items[0].Labels, 1)
+
+	require.NoError(t, containerRepo.AttachLabel(ctx, containerID, label.ID))
+	require.NoError(t, containerRepo.AttachLabel(ctx, containerID, label.ID))
+	container, err = containerRepo.Get(ctx, containerID)
+	require.NoError(t, err)
+	require.Len(t, container.Labels, 1)
+	require.Empty(t, container.InheritedLabels)
+
+	require.NoError(t, containerRepo.DetachLabel(ctx, containerID, label.ID))
+	require.NoError(t, containerRepo.DetachLabel(ctx, containerID, label.ID))
+	require.NoError(t, labelRepo.Delete(ctx, label.ID))
+	item, err = itemRepo.Get(ctx, itemID)
+	require.NoError(t, err)
+	require.Empty(t, item.Labels)
+	_, err = itemRepo.GetByLabelCode(ctx, "SCAN-CAMERA")
+	require.NoError(t, err)
+}
+
 func TestRepositoryIntegrationLocationNameAndNoRows(t *testing.T) {
 	pool := repositoryIntegrationPool(t)
 	ctx := context.Background()
@@ -178,7 +223,10 @@ func truncateRepositoryTables(ctx context.Context, pool *pgxpool.Pool) error {
 			backup_schedules,
 			backup_targets,
 			photos,
+			item_labels,
+			container_labels,
 			labels,
+			scan_labels,
 			item_container,
 			items,
 			containers,

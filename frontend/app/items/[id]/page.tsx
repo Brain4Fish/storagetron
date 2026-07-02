@@ -27,6 +27,8 @@ import { PrintLabelDialog } from "@/components/print-label-dialog";
 import { EditRecordDialog } from "@/components/forms/edit-record-dialog";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
+import { LabelList } from "@/components/labels/label-chip";
+import { labelSelectionDiff } from "@/lib/labels";
 
 export default function ItemDetailsPage() {
     const params = useParams();
@@ -49,15 +51,26 @@ export default function ItemDetailsPage() {
         queryKey: ["locations"],
         queryFn: api.listLocations,
     });
+    const { data: labels = [] } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels });
     const { data: containers = [] } = useQuery({
         queryKey: ["containers"],
         queryFn: api.listContainers,
     });
 
     const row = useMemo(() => data ? buildItemRows([data], containers)[0] : null, [containers, data]);
+    const selectedLabelIds = useMemo(() => (data?.labels ?? []).map((label) => label.id), [data?.labels]);
 
     const updateMutation = useMutation({
-        mutationFn: (payload: { name: string; description: string; location_id?: string | null }) => api.updateItem(id, payload),
+        mutationFn: async (payload: { name: string; description: string; location_id?: string | null; label_ids?: string[] }) => {
+            const { label_ids = [], ...record } = payload;
+            await api.updateItem(id, record);
+            const diff = labelSelectionDiff(data?.labels ?? [], label_ids);
+            const results = await Promise.allSettled([
+                ...diff.attach.map((labelId) => api.attachItemLabel(id, labelId)),
+                ...diff.detach.map((labelId) => api.detachItemLabel(id, labelId)),
+            ]);
+            if (results.some((result) => result.status === "rejected")) throw new Error("Item details were saved, but some label changes failed. Try saving again.");
+        },
         onSuccess: async () => {
             setEditError("");
             setEditOpen(false);
@@ -67,8 +80,13 @@ export default function ItemDetailsPage() {
                 queryClient.invalidateQueries({ queryKey: ["containers"] }),
             ]);
         },
-        onError: (err) => {
-            setEditError(err instanceof ApiError ? err.message : "Failed to update item");
+        onError: (err) => setEditError(err instanceof Error ? err.message : "Failed to update item"),
+        onSettled: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["item", id] }),
+                queryClient.invalidateQueries({ queryKey: ["items"] }),
+                queryClient.invalidateQueries({ queryKey: ["containers"] }),
+            ]);
         },
     });
 
@@ -162,6 +180,10 @@ export default function ItemDetailsPage() {
                                         {row.status === "stored" ? "In Storage" : "No Container"}
                                     </span>
                                 </div>
+                                <div className="mt-4">
+                                    <p className="mb-2 text-sm font-medium">Labels</p>
+                                    <LabelList labels={data.labels} empty="No labels" />
+                                </div>
                                 <div className="mt-6 grid gap-4 border-y border-border py-5 sm:grid-cols-2">
                                     <InfoLink icon={MapPin} label="Location" value={row.locationLabel} />
                                     <InfoLink icon={Box} label="Container" value={row.containerLabel} href={row.container ? `/containers/${row.container.id}` : undefined} />
@@ -197,7 +219,7 @@ export default function ItemDetailsPage() {
 
                     <aside className="space-y-4">
                         <section className="apple-card rounded-2xl p-5">
-                            <h2 className="mb-4 text-lg font-semibold">Label & QR Code</h2>
+                            <h2 className="mb-4 text-lg font-semibold">QR Code</h2>
                             <div className="flex flex-col items-center gap-4">
                                 <div className="rounded-2xl border border-border bg-white p-4">
                                     <QRCode value={itemUrl} />
@@ -265,6 +287,8 @@ export default function ItemDetailsPage() {
                 details={data.description}
                 locationId={data.location_id ?? ""}
                 locations={locations}
+                labels={labels}
+                selectedLabelIds={selectedLabelIds}
                 isSaving={updateMutation.isPending}
                 error={editError}
                 onOpenChange={setEditOpen}
@@ -280,7 +304,7 @@ export default function ItemDetailsPage() {
                 }}
                 onConfirm={() => deleteMutation.mutate()}
             >
-                This permanently deletes <span className="font-semibold text-zinc-950">{data.name}</span>, including photos and labels.
+                This permanently deletes <span className="font-semibold text-zinc-950">{data.name}</span>, including photos and label assignments.
             </DeleteConfirmationDialog>
         </PageShell>
     );

@@ -24,7 +24,7 @@ const navItems = [
     { href: "/items", label: "Items", icon: Package },
     { href: "/containers", label: "Containers", icon: Box },
     { href: "/locations", label: "Locations", icon: MapPin },
-    { href: "/print/items", label: "Labels", icon: Tags },
+    { href: "/labels", label: "Labels", icon: Tags },
     { href: "/scan", label: "Scan", icon: QrCode },
 ];
 
@@ -37,7 +37,7 @@ const mobileItems = [
     { href: "/", label: "Home", icon: Home },
     { href: "/items", label: "Inventory", icon: Box },
     { href: "/scan", label: "Scan", icon: QrCode },
-    { href: "/print/items", label: "Labels", icon: Tags },
+    { href: "/labels", label: "Labels", icon: Tags },
     { href: "/settings/backups", label: "Settings", icon: Settings },
 ];
 

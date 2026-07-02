@@ -16,9 +16,11 @@ type ContainerRepository interface {
 	Delete(context.Context, uuid.UUID) error
 	AddItem(context.Context, uuid.UUID, uuid.UUID) error
 	RemoveItem(context.Context, uuid.UUID, uuid.UUID) error
+	AttachLabel(context.Context, uuid.UUID, uuid.UUID) error
+	DetachLabel(context.Context, uuid.UUID, uuid.UUID) error
 	GetByLabelCode(context.Context, string) (model.Container, error)
-	GetLabelByContainerID(context.Context, uuid.UUID) (*model.Label, error)
-	GetLabelByCode(context.Context, string) (*model.Label, error)
+	GetLabelByContainerID(context.Context, uuid.UUID) (*model.ScanLabel, error)
+	GetLabelByCode(context.Context, string) (*model.ScanLabel, error)
 }
 
 type ContainerService struct {
@@ -119,13 +121,33 @@ func (s *ContainerService) RemoveItem(ctx context.Context, containerID, itemID u
 }
 
 func (s *ContainerService) GetByCode(ctx context.Context, code string) (model.Container, error) {
-	return s.repo.GetByLabelCode(ctx, code)
+	container, err := s.repo.GetByLabelCode(ctx, code)
+	if err != nil {
+		return model.Container{}, err
+	}
+	if s.photoSvc == nil {
+		return container, nil
+	}
+	photos, err := s.photoSvc.ListByContainerID(ctx, container.ID)
+	if err != nil {
+		return model.Container{}, err
+	}
+	container.Photos = photos
+	return container, nil
 }
 
-func (s *ContainerService) GetLabel(ctx context.Context, containerID uuid.UUID) (*model.Label, error) {
+func (s *ContainerService) GetLabel(ctx context.Context, containerID uuid.UUID) (*model.ScanLabel, error) {
 	return s.repo.GetLabelByContainerID(ctx, containerID)
 }
 
-func (s *ContainerService) GetLabelByCode(ctx context.Context, code string) (*model.Label, error) {
+func (s *ContainerService) GetLabelByCode(ctx context.Context, code string) (*model.ScanLabel, error) {
 	return s.repo.GetLabelByCode(ctx, code)
+}
+
+func (s *ContainerService) AttachLabel(ctx context.Context, containerID, labelID uuid.UUID) error {
+	return s.repo.AttachLabel(ctx, containerID, labelID)
+}
+
+func (s *ContainerService) DetachLabel(ctx context.Context, containerID, labelID uuid.UUID) error {
+	return s.repo.DetachLabel(ctx, containerID, labelID)
 }

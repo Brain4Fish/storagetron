@@ -35,6 +35,22 @@ test("api methods return undefined for 204 responses", async () => {
     assert.equal(calls[1].init?.method, "DELETE");
 });
 
+test("label attachment methods use idempotent PUT and matching DELETE routes", async () => {
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ input, init });
+        return new Response(null, { status: 204 });
+    };
+
+    await api.attachItemLabel("item-1", "label-1");
+    await api.detachContainerLabel("container-1", "label-2");
+
+    assert.equal(calls[0].input, "/api/items/item-1/labels/label-1");
+    assert.equal(calls[0].init?.method, "PUT");
+    assert.equal(calls[1].input, "/api/containers/container-1/labels/label-2");
+    assert.equal(calls[1].init?.method, "DELETE");
+});
+
 test("api methods surface JSON error messages with status code", async () => {
     global.fetch = async () => Response.json({ error: "item not found" }, { status: 404 });
 

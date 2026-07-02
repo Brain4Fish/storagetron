@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Plus, Trash2 } from "lucide-react";
+import { Download, Plus, Search, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Container } from "@/lib/api";
 import { downloadSelectedKitsXlsx } from "@/lib/export-assets";
@@ -27,11 +27,22 @@ export default function KitsPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState("");
     const [actionError, setActionError] = useState("");
+    const [query, setQuery] = useState("");
     const { data, isLoading } = useQuery({
         queryKey: ["containers"],
         queryFn: api.listContainers,
     });
-    const containers = data ?? [];
+    const containers = useMemo(() => data ?? [], [data]);
+    const filteredContainers = useMemo(() => {
+        const normalized = query.trim().toLowerCase();
+        if (!normalized) return containers;
+        return containers.filter((container) => [
+            container.name,
+            container.description,
+            ...(container.labels ?? []).map((label) => label.name),
+            ...(container.inherited_labels ?? []).map((label) => label.name),
+        ].filter(Boolean).join(" ").toLowerCase().includes(normalized));
+    }, [containers, query]);
     const selectedCount = selectedContainerIds.size;
 
     const selectedContainers = useMemo(
@@ -164,6 +175,13 @@ export default function KitsPage() {
                     </Button>
                 </div>
 
+                <section className="apple-card rounded-2xl p-4">
+                    <label className="relative block">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search containers or labels..." className="h-11 w-full rounded-xl border border-border bg-white pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                    </label>
+                </section>
+
                 {selectedCount > 0 ? (
                     <div className="apple-card flex flex-col gap-3 rounded-2xl p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -195,7 +213,7 @@ export default function KitsPage() {
                     <p className="text-sm text-muted-foreground">Loading containers...</p>
                 ) : (
                     <ContainersTable
-                        containers={containers}
+                        containers={filteredContainers}
                         selectedContainerIds={selectedContainerIds}
                         onToggleContainer={toggleContainer}
                         onToggleContainers={toggleContainers}

@@ -177,6 +177,21 @@ curl -X POST http://localhost:8086/containers/{container_id}/items \
   -d '{"item_id":"{item_id}"}'
 ```
 
+Create and attach a reusable organizational label:
+
+```bash
+label_id=$(curl -s -X POST http://localhost:8086/labels \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Electronics","color":"blue"}' | jq -r .id)
+
+curl -X PUT "http://localhost:8086/items/{item_id}/labels/${label_id}"
+curl -X PUT "http://localhost:8086/containers/{container_id}/labels/${label_id}"
+```
+
+Attachment `PUT` calls are idempotent. Use `DELETE` on the same item/container label URL to detach it. Container responses include direct `labels` and `inherited_labels` derived from their contained items. Deleting `/labels/{label_id}` removes its assignments without deleting inventory.
+
+Reusable labels are separate from the optional `label_code` scan identifiers used by QR lookup.
+
 Delete an item:
 
 ```bash

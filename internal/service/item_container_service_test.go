@@ -211,7 +211,10 @@ func (r *fakeItemRepository) GetByLabelCode(context.Context, string) (model.Item
 	return model.Item{}, pgx.ErrNoRows
 }
 
-func (r *fakeItemRepository) GetLabelByCode(context.Context, string) (*model.Label, error) {
+func (r *fakeItemRepository) AttachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+func (r *fakeItemRepository) DetachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+
+func (r *fakeItemRepository) GetLabelByCode(context.Context, string) (*model.ScanLabel, error) {
 	return nil, nil
 }
 
@@ -253,14 +256,21 @@ func (r *fakeContainerRepository) RemoveItem(context.Context, uuid.UUID, uuid.UU
 	return nil
 }
 
+func (r *fakeContainerRepository) AttachLabel(context.Context, uuid.UUID, uuid.UUID) error {
+	return nil
+}
+func (r *fakeContainerRepository) DetachLabel(context.Context, uuid.UUID, uuid.UUID) error {
+	return nil
+}
+
 func (r *fakeContainerRepository) GetByLabelCode(context.Context, string) (model.Container, error) {
 	return model.Container{}, pgx.ErrNoRows
 }
 
-func (r *fakeContainerRepository) GetLabelByContainerID(context.Context, uuid.UUID) (*model.Label, error) {
+func (r *fakeContainerRepository) GetLabelByContainerID(context.Context, uuid.UUID) (*model.ScanLabel, error) {
 	return nil, nil
 }
 
-func (r *fakeContainerRepository) GetLabelByCode(context.Context, string) (*model.Label, error) {
+func (r *fakeContainerRepository) GetLabelByCode(context.Context, string) (*model.ScanLabel, error) {
 	return nil, nil
 }

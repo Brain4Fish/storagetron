@@ -41,7 +41,7 @@ func (r *ItemRepo) Create(ctx context.Context, item model.Item, labelCode string
 
 	if labelCode != "" {
 		_, err = tx.Exec(ctx, `
-			INSERT INTO labels (code, item_id)
+			INSERT INTO scan_labels (code, item_id)
 			VALUES ($1, $2)
 		`, labelCode, item.ID)
 		if err != nil {
@@ -68,8 +68,6 @@ func (r *ItemRepo) List(ctx context.Context) ([]model.Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
 	res := make([]model.Item, 0)
 	for rows.Next() {
 		var i model.Item
@@ -78,7 +76,15 @@ func (r *ItemRepo) List(ctx context.Context) ([]model.Item, error) {
 		}
 		res = append(res, i)
 	}
-	return res, rows.Err()
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	if err := r.hydrateLabels(ctx, res); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (r *ItemRepo) ListPage(ctx context.Context, limit, offset int) ([]model.Item, int, error) {
@@ -98,8 +104,6 @@ func (r *ItemRepo) ListPage(ctx context.Context, limit, offset int) ([]model.Ite
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
-
 	res := make([]model.Item, 0)
 	for rows.Next() {
 		var i model.Item
@@ -109,6 +113,11 @@ func (r *ItemRepo) ListPage(ctx context.Context, limit, offset int) ([]model.Ite
 		res = append(res, i)
 	}
 	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, 0, err
+	}
+	rows.Close()
+	if err := r.hydrateLabels(ctx, res); err != nil {
 		return nil, 0, err
 	}
 
@@ -134,6 +143,13 @@ func (r *ItemRepo) Get(ctx context.Context, id uuid.UUID) (model.Item, error) {
 		LEFT JOIN locations il ON il.id = c.location_id
 		WHERE i.id = $1
 	`, id), &i)
+	if err == nil {
+		labels, labelErr := listLabelsByItemIDs(ctx, r.db, []uuid.UUID{id})
+		if labelErr != nil {
+			return model.Item{}, labelErr
+		}
+		i.Labels = labels[id]
+	}
 	return i, err
 }
 
@@ -167,7 +183,7 @@ func (r *ItemRepo) GetByLabelCode(ctx context.Context, code string) (model.Item,
 	var itemID uuid.UUID
 	err := r.db.QueryRow(ctx, `
 		SELECT item_id
-		FROM labels
+		FROM scan_labels
 		WHERE code = $1 AND item_id IS NOT NULL
 	`, code).Scan(&itemID)
 	if err != nil {
@@ -176,11 +192,11 @@ func (r *ItemRepo) GetByLabelCode(ctx context.Context, code string) (model.Item,
 	return r.Get(ctx, itemID)
 }
 
-func (r *ItemRepo) GetLabelByCode(ctx context.Context, code string) (*model.Label, error) {
-	var label model.Label
+func (r *ItemRepo) GetLabelByCode(ctx context.Context, code string) (*model.ScanLabel, error) {
+	var label model.ScanLabel
 	err := r.db.QueryRow(ctx, `
 		SELECT code, item_id, container_id, created_at
-		FROM labels
+		FROM scan_labels
 		WHERE code = $1
 	`, code).Scan(&label.Code, &label.ItemID, &label.ContainerID, &label.CreatedAt)
 	if err != nil {
@@ -190,6 +206,63 @@ func (r *ItemRepo) GetLabelByCode(ctx context.Context, code string) (*model.Labe
 		return nil, err
 	}
 	return &label, nil
+}
+
+func (r *ItemRepo) AttachLabel(ctx context.Context, itemID, labelID uuid.UUID) error {
+	cmd, err := r.db.Exec(ctx, `
+		INSERT INTO item_labels (item_id, label_id)
+		SELECT $1, $2
+		WHERE EXISTS (SELECT 1 FROM items WHERE id = $1)
+		  AND EXISTS (SELECT 1 FROM labels WHERE id = $2)
+		ON CONFLICT DO NOTHING
+	`, itemID, labelID)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() > 0 {
+		return nil
+	}
+	var exists bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM items WHERE id = $1)
+		   AND EXISTS (SELECT 1 FROM labels WHERE id = $2)
+	`, itemID, labelID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (r *ItemRepo) DetachLabel(ctx context.Context, itemID, labelID uuid.UUID) error {
+	var exists bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM items WHERE id = $1)
+		   AND EXISTS (SELECT 1 FROM labels WHERE id = $2)
+	`, itemID, labelID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return pgx.ErrNoRows
+	}
+	_, err := r.db.Exec(ctx, `DELETE FROM item_labels WHERE item_id = $1 AND label_id = $2`, itemID, labelID)
+	return err
+}
+
+func (r *ItemRepo) hydrateLabels(ctx context.Context, items []model.Item) error {
+	ids := make([]uuid.UUID, 0, len(items))
+	for i := range items {
+		ids = append(ids, items[i].ID)
+	}
+	labels, err := listLabelsByItemIDs(ctx, r.db, ids)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		items[i].Labels = labels[items[i].ID]
+	}
+	return nil
 }
 
 func scanItemWithLocations(row scanner, item *model.Item) error {

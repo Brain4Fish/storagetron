@@ -133,11 +133,11 @@ func (r *PhotoRepo) DeleteByItemID(ctx context.Context, itemID, photoID uuid.UUI
 	return photo, nil
 }
 
-func (r *PhotoRepo) GetLabelByItemID(ctx context.Context, itemID uuid.UUID) (*model.Label, error) {
-	var label model.Label
+func (r *PhotoRepo) GetLabelByItemID(ctx context.Context, itemID uuid.UUID) (*model.ScanLabel, error) {
+	var label model.ScanLabel
 	err := r.db.QueryRow(ctx, `
 		SELECT code, item_id, container_id, created_at
-		FROM labels
+		FROM scan_labels
 		WHERE item_id = $1
 		LIMIT 1
 	`, itemID).Scan(&label.Code, &label.ItemID, &label.ContainerID, &label.CreatedAt)

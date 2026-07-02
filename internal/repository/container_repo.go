@@ -37,7 +37,7 @@ func (r *ContainerRepo) Create(ctx context.Context, c model.Container, labelCode
 
 	if labelCode != "" {
 		_, err = tx.Exec(ctx, `
-			INSERT INTO labels (code, container_id)
+			INSERT INTO scan_labels (code, container_id)
 			VALUES ($1, $2)
 		`, labelCode, c.ID)
 		if err != nil {
@@ -77,7 +77,13 @@ func (r *ContainerRepo) List(ctx context.Context) ([]model.Container, error) {
 		c.Items = items
 		containers = append(containers, c)
 	}
-	return containers, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := r.hydrateLabels(ctx, containers); err != nil {
+		return nil, err
+	}
+	return containers, nil
 }
 
 func (r *ContainerRepo) Get(ctx context.Context, id uuid.UUID) (model.Container, error) {
@@ -100,6 +106,27 @@ func (r *ContainerRepo) Get(ctx context.Context, id uuid.UUID) (model.Container,
 	}
 	c.Items = items
 	c.ItemsCount = len(items)
+	direct, err := listLabelsByContainerIDs(ctx, r.db, []uuid.UUID{id})
+	if err != nil {
+		return model.Container{}, err
+	}
+	inherited, err := listInheritedLabelsByContainerIDs(ctx, r.db, []uuid.UUID{id})
+	if err != nil {
+		return model.Container{}, err
+	}
+	c.Labels = direct[id]
+	c.InheritedLabels = inherited[id]
+	itemIDs := make([]uuid.UUID, 0, len(c.Items))
+	for _, item := range c.Items {
+		itemIDs = append(itemIDs, item.ID)
+	}
+	itemLabels, err := listLabelsByItemIDs(ctx, r.db, itemIDs)
+	if err != nil {
+		return model.Container{}, err
+	}
+	for i := range c.Items {
+		c.Items[i].Labels = itemLabels[c.Items[i].ID]
+	}
 
 	return c, nil
 }
@@ -167,7 +194,7 @@ func (r *ContainerRepo) GetByLabelCode(ctx context.Context, code string) (model.
 	var containerID uuid.UUID
 	err := r.db.QueryRow(ctx, `
 		SELECT container_id
-		FROM labels
+		FROM scan_labels
 		WHERE code = $1 AND container_id IS NOT NULL
 	`, code).Scan(&containerID)
 	if err != nil {
@@ -176,11 +203,11 @@ func (r *ContainerRepo) GetByLabelCode(ctx context.Context, code string) (model.
 	return r.Get(ctx, containerID)
 }
 
-func (r *ContainerRepo) GetLabelByContainerID(ctx context.Context, containerID uuid.UUID) (*model.Label, error) {
-	var label model.Label
+func (r *ContainerRepo) GetLabelByContainerID(ctx context.Context, containerID uuid.UUID) (*model.ScanLabel, error) {
+	var label model.ScanLabel
 	err := r.db.QueryRow(ctx, `
 		SELECT code, item_id, container_id, created_at
-		FROM labels
+		FROM scan_labels
 		WHERE container_id = $1
 		LIMIT 1
 	`, containerID).Scan(&label.Code, &label.ItemID, &label.ContainerID, &label.CreatedAt)
@@ -193,11 +220,11 @@ func (r *ContainerRepo) GetLabelByContainerID(ctx context.Context, containerID u
 	return &label, nil
 }
 
-func (r *ContainerRepo) GetLabelByCode(ctx context.Context, code string) (*model.Label, error) {
-	var label model.Label
+func (r *ContainerRepo) GetLabelByCode(ctx context.Context, code string) (*model.ScanLabel, error) {
+	var label model.ScanLabel
 	err := r.db.QueryRow(ctx, `
 		SELECT code, item_id, container_id, created_at
-		FROM labels
+		FROM scan_labels
 		WHERE code = $1
 	`, code).Scan(&label.Code, &label.ItemID, &label.ContainerID, &label.CreatedAt)
 	if err != nil {
@@ -207,6 +234,79 @@ func (r *ContainerRepo) GetLabelByCode(ctx context.Context, code string) (*model
 		return nil, err
 	}
 	return &label, nil
+}
+
+func (r *ContainerRepo) AttachLabel(ctx context.Context, containerID, labelID uuid.UUID) error {
+	cmd, err := r.db.Exec(ctx, `
+		INSERT INTO container_labels (container_id, label_id)
+		SELECT $1, $2
+		WHERE EXISTS (SELECT 1 FROM containers WHERE id = $1)
+		  AND EXISTS (SELECT 1 FROM labels WHERE id = $2)
+		ON CONFLICT DO NOTHING
+	`, containerID, labelID)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() > 0 {
+		return nil
+	}
+	var exists bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM containers WHERE id = $1)
+		   AND EXISTS (SELECT 1 FROM labels WHERE id = $2)
+	`, containerID, labelID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (r *ContainerRepo) DetachLabel(ctx context.Context, containerID, labelID uuid.UUID) error {
+	var exists bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM containers WHERE id = $1)
+		   AND EXISTS (SELECT 1 FROM labels WHERE id = $2)
+	`, containerID, labelID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return pgx.ErrNoRows
+	}
+	_, err := r.db.Exec(ctx, `DELETE FROM container_labels WHERE container_id = $1 AND label_id = $2`, containerID, labelID)
+	return err
+}
+
+func (r *ContainerRepo) hydrateLabels(ctx context.Context, containers []model.Container) error {
+	containerIDs := make([]uuid.UUID, 0, len(containers))
+	itemIDs := make([]uuid.UUID, 0)
+	for i := range containers {
+		containerIDs = append(containerIDs, containers[i].ID)
+		for _, item := range containers[i].Items {
+			itemIDs = append(itemIDs, item.ID)
+		}
+	}
+	direct, err := listLabelsByContainerIDs(ctx, r.db, containerIDs)
+	if err != nil {
+		return err
+	}
+	inherited, err := listInheritedLabelsByContainerIDs(ctx, r.db, containerIDs)
+	if err != nil {
+		return err
+	}
+	itemLabels, err := listLabelsByItemIDs(ctx, r.db, itemIDs)
+	if err != nil {
+		return err
+	}
+	for i := range containers {
+		containers[i].Labels = direct[containers[i].ID]
+		containers[i].InheritedLabels = inherited[containers[i].ID]
+		for j := range containers[i].Items {
+			containers[i].Items[j].Labels = itemLabels[containers[i].Items[j].ID]
+		}
+	}
+	return nil
 }
 
 func (r *ContainerRepo) getContainerItems(ctx context.Context, containerID uuid.UUID) ([]model.Item, error) {

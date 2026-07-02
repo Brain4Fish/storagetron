@@ -31,6 +31,7 @@ export type Item = {
     inherited_location?: Location;
     created_at: string;
     photos?: Photo[];
+    labels: InventoryLabel[];
 };
 
 export type ItemListResponse = {
@@ -50,6 +51,18 @@ export type Container = {
     items?: Item[];
     items_count?: number;
     photos?: Photo[];
+    labels: InventoryLabel[];
+    inherited_labels: InventoryLabel[];
+};
+
+export type LabelColor = "gray" | "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "pink";
+
+export type InventoryLabel = {
+    id: string;
+    name: string;
+    color: LabelColor;
+    created_at: string;
+    updated_at: string;
 };
 
 export type Location = {
@@ -244,11 +257,15 @@ export const api = {
         request<ItemListResponse>(`/items?limit=${limit}&offset=${offset}`),
     getItem: (id: string) => request<Item>(`/items/${id}`),
     createItem: (data: any) =>
-        request("/items", { method: "POST", body: JSON.stringify(data) }),
+        request<Item>("/items", { method: "POST", body: JSON.stringify(data) }),
     updateItem: (id: string, data: any) =>
         request<Item>(`/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteItem: (id: string) =>
         request(`/items/${id}`, { method: "DELETE" }),
+    attachItemLabel: (itemId: string, labelId: string) =>
+        request<void>(`/items/${itemId}/labels/${labelId}`, { method: "PUT" }),
+    detachItemLabel: (itemId: string, labelId: string) =>
+        request<void>(`/items/${itemId}/labels/${labelId}`, { method: "DELETE" }),
     listContainers: () => request<Container[]>("/containers"),
     getContainer: (id: string) => request<Container>(`/containers/${id}`),
     createContainer: (data: any) =>
@@ -257,6 +274,10 @@ export const api = {
         request<Container>(`/containers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteContainer: (id: string) =>
         request<void>(`/containers/${id}`, { method: "DELETE" }),
+    attachContainerLabel: (containerId: string, labelId: string) =>
+        request<void>(`/containers/${containerId}/labels/${labelId}`, { method: "PUT" }),
+    detachContainerLabel: (containerId: string, labelId: string) =>
+        request<void>(`/containers/${containerId}/labels/${labelId}`, { method: "DELETE" }),
     addItemToContainer: (containerId: string, itemId: string) =>
         request<void>(`/containers/${containerId}/items`, {
             method: "POST",
@@ -285,6 +306,12 @@ export const api = {
         request<Location>(`/locations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteLocation: (id: string) =>
         request<void>(`/locations/${id}`, { method: "DELETE" }),
+    listLabels: () => request<InventoryLabel[]>("/labels"),
+    createLabel: (data: { name: string; color: LabelColor }) =>
+        request<InventoryLabel>("/labels", { method: "POST", body: JSON.stringify(data) }),
+    updateLabel: (id: string, data: { name: string; color: LabelColor }) =>
+        request<InventoryLabel>(`/labels/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteLabel: (id: string) => request<void>(`/labels/${id}`, { method: "DELETE" }),
     scanCode: (code: string) =>
         request<ScanResult>(`/scan/${encodeURIComponent(normalizeScanCode(code))}`),
     listBackupTargets: () => request<BackupTarget[]>("/backup/targets"),

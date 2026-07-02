@@ -86,6 +86,25 @@ func TestItemHandlerDeleteReturnsNoContent(t *testing.T) {
 	require.Equal(t, itemID, repo.deletedID)
 }
 
+func TestItemHandlerAttachAndDetachLabelAreIdempotent(t *testing.T) {
+	itemID := uuid.New()
+	labelID := uuid.New()
+	handler := NewItemHandler(newInventoryItemService(&inventoryItemRepo{}), zap.NewNop())
+
+	for _, method := range []string{http.MethodPut, http.MethodPut, http.MethodDelete, http.MethodDelete} {
+		rec := httptest.NewRecorder()
+		req := inventoryRequestWithParams(method, "/items/labels", "", map[string]string{
+			"id": itemID.String(), "label_id": labelID.String(),
+		})
+		if method == http.MethodPut {
+			handler.AttachLabel(rec, req)
+		} else {
+			handler.DetachLabel(rec, req)
+		}
+		require.Equal(t, http.StatusNoContent, rec.Code)
+	}
+}
+
 func TestContainerHandlerAddItemMapsAlreadyAssignedToConflict(t *testing.T) {
 	containerID := uuid.New()
 	itemID := uuid.New()
@@ -134,6 +153,25 @@ func TestContainerHandlerDeleteReturnsNoContent(t *testing.T) {
 
 	require.Equal(t, http.StatusNoContent, rec.Code)
 	require.Equal(t, containerID, repo.deletedID)
+}
+
+func TestContainerHandlerAttachAndDetachLabelAreIdempotent(t *testing.T) {
+	containerID := uuid.New()
+	labelID := uuid.New()
+	handler := NewContainerHandler(service.NewContainerService(&inventoryContainerRepo{}, nil), zap.NewNop())
+
+	for _, method := range []string{http.MethodPut, http.MethodPut, http.MethodDelete, http.MethodDelete} {
+		rec := httptest.NewRecorder()
+		req := inventoryRequestWithParams(method, "/containers/labels", "", map[string]string{
+			"id": containerID.String(), "label_id": labelID.String(),
+		})
+		if method == http.MethodPut {
+			handler.AttachLabel(rec, req)
+		} else {
+			handler.DetachLabel(rec, req)
+		}
+		require.Equal(t, http.StatusNoContent, rec.Code)
+	}
 }
 
 func TestContainerHandlerDeleteRejectsInvalidID(t *testing.T) {
@@ -321,7 +359,10 @@ func (r *inventoryItemRepo) GetByLabelCode(context.Context, string) (model.Item,
 	return model.Item{}, pgx.ErrNoRows
 }
 
-func (r *inventoryItemRepo) GetLabelByCode(context.Context, string) (*model.Label, error) {
+func (r *inventoryItemRepo) AttachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+func (r *inventoryItemRepo) DetachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+
+func (r *inventoryItemRepo) GetLabelByCode(context.Context, string) (*model.ScanLabel, error) {
 	return nil, nil
 }
 
@@ -367,15 +408,18 @@ func (r *inventoryContainerRepo) RemoveItem(context.Context, uuid.UUID, uuid.UUI
 	return r.removeErr
 }
 
+func (r *inventoryContainerRepo) AttachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+func (r *inventoryContainerRepo) DetachLabel(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+
 func (r *inventoryContainerRepo) GetByLabelCode(context.Context, string) (model.Container, error) {
 	return model.Container{}, pgx.ErrNoRows
 }
 
-func (r *inventoryContainerRepo) GetLabelByContainerID(context.Context, uuid.UUID) (*model.Label, error) {
+func (r *inventoryContainerRepo) GetLabelByContainerID(context.Context, uuid.UUID) (*model.ScanLabel, error) {
 	return nil, nil
 }
 
-func (r *inventoryContainerRepo) GetLabelByCode(context.Context, string) (*model.Label, error) {
+func (r *inventoryContainerRepo) GetLabelByCode(context.Context, string) (*model.ScanLabel, error) {
 	return nil, nil
 }
 
@@ -453,7 +497,7 @@ func (r *inventoryPhotoRepo) DeleteByItemID(_ context.Context, itemID, photoID u
 	return r.deletedItemPhoto, r.deleteItemErr
 }
 
-func (r *inventoryPhotoRepo) GetLabelByItemID(context.Context, uuid.UUID) (*model.Label, error) {
+func (r *inventoryPhotoRepo) GetLabelByItemID(context.Context, uuid.UUID) (*model.ScanLabel, error) {
 	return nil, nil
 }
 
