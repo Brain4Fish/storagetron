@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api } from "../lib/api";
 
 test("api.scanCode normalizes URLs and encodes extracted scan code", async () => {
     const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
