@@ -8,7 +8,6 @@ import {
     MapPin,
     Package,
     Plus,
-    Tags,
     QrCode,
     Search,
 } from "lucide-react";
@@ -86,7 +85,7 @@ export default function HomePage() {
                 {isLoading ? (
                     <div className="apple-card rounded-2xl p-5 text-sm text-muted-foreground">Loading inventory...</div>
                 ) : (
-                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
+                    <div className="grid items-stretch gap-4 xl:grid-cols-2">
                         <section className="apple-card rounded-2xl p-5">
                             <div className="mb-4 flex items-center justify-between">
                                 <h2 className="text-lg font-semibold">Containers</h2>
@@ -141,33 +140,6 @@ export default function HomePage() {
                     </div>
                 )}
 
-                <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
-                    <div className="apple-card rounded-2xl p-5">
-                        <h2 className="text-lg font-semibold">Move Progress</h2>
-                        <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center">
-                            <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded-full border-[10px] border-emerald-100 text-center">
-                                <div>
-                                    <div className="text-3xl font-semibold">{items.length - looseItems}</div>
-                                    <div className="text-xs text-muted-foreground">items packed</div>
-                                </div>
-                            </div>
-                            <div className="grid flex-1 gap-3">
-                                <Insight label="Items in containers" value={items.length - looseItems} icon={Box} />
-                                <Insight label="Items without container" value={looseItems} icon={Package} />
-                                <Insight label="Locations configured" value={locations.length} icon={MapPin} />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="apple-card rounded-2xl p-5">
-                        <h2 className="text-lg font-semibold">Quick Actions</h2>
-                        <div className="mt-4 grid gap-2">
-                            <QuickAction href="/scan" icon={QrCode} label="Scan QR Code" />
-                            <QuickAction href="/items" icon={Plus} label="Add New Item" />
-                            <QuickAction href="/labels" icon={Tags} label="Manage Labels" />
-                            <QuickAction href="/locations" icon={MapPin} label="Add New Location" />
-                        </div>
-                    </div>
-                </section>
             </div>
         </PageShell>
     );
@@ -225,48 +197,6 @@ function RecentItem({ item, containers }: { item: Item; containers: Container[] 
                 </p>
             </div>
             <div className="text-right text-xs text-muted-foreground">{formatDate(item.created_at)}</div>
-        </Link>
-    );
-}
-
-function Insight({
-    icon: Icon,
-    label,
-    value,
-}: {
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-    value: number;
-}) {
-    return (
-        <div className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
-            <span className="flex items-center gap-3 text-sm text-zinc-700">
-                <Icon className="h-4 w-4 text-primary" />
-                {label}
-            </span>
-            <span className="font-semibold">{value}</span>
-        </div>
-    );
-}
-
-function QuickAction({
-    href,
-    icon: Icon,
-    label,
-}: {
-    href: string;
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-}) {
-    return (
-        <Link href={href} className="flex items-center justify-between rounded-xl border border-border px-4 py-3 text-sm font-medium transition hover:bg-zinc-50">
-            <span className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-primary">
-                    <Icon className="h-4 w-4" />
-                </span>
-                {label}
-            </span>
-            <ArrowRight className="h-4 w-4 text-muted-foreground" />
         </Link>
     );
 }
