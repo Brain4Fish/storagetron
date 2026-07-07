@@ -43,7 +43,6 @@ export default function ScanPage() {
     const pendingScanRef = useRef(false);
     const [scannerReady, setScannerReady] = useState(false);
     const [cameraError, setCameraError] = useState("");
-    const [lastCode, setLastCode] = useState("");
 
     const scanMutation = useMutation({
         mutationFn: (code: string) => api.scanCode(code),
@@ -62,6 +61,7 @@ export default function ScanPage() {
             setCameraError(err instanceof ApiError ? err.message : "Failed to resolve scanned code.");
         },
     });
+    const resolveScan = scanMutation.mutate;
 
     useEffect(() => {
         let active = true;
@@ -83,13 +83,12 @@ export default function ScanPage() {
                         }
                         lastCodeRef.current = decodedText;
                         pendingScanRef.current = true;
-                        setLastCode(decodedText);
                         if (scanner.getState() === Html5QrcodeScannerState.SCANNING) {
                             try {
                                 scanner.pause(true);
                             } catch {}
                         }
-                        scanMutation.mutate(decodedText);
+                        resolveScan(decodedText);
                     },
                     () => {},
                 );
@@ -123,7 +122,7 @@ export default function ScanPage() {
                 }
             }
         };
-    }, []);
+    }, [resolveScan]);
 
     const handleResume = async () => {
         const scanner = scannerRef.current;
@@ -133,7 +132,6 @@ export default function ScanPage() {
         setCameraError("");
         lastCodeRef.current = "";
         pendingScanRef.current = false;
-        setLastCode("");
         try {
             await scanner.resume();
         } catch {

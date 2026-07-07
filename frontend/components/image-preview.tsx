@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -41,15 +42,18 @@ export function ImagePreview({ src, alt = "", className, imageClassName }: Image
                 type="button"
                 onClick={() => setOpen(true)}
                 className={cn(
-                    "block h-full w-full overflow-hidden text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "relative block h-full w-full overflow-hidden text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     className,
                 )}
                 aria-label={alt ? `Enlarge ${alt}` : "Enlarge photo"}
             >
-                <img
+                <Image
                     src={src}
                     alt={alt}
-                    className={cn("h-full w-full object-cover transition-transform hover:scale-105", imageClassName)}
+                    fill
+                    sizes="(min-width: 768px) 20vw, 50vw"
+                    unoptimized
+                    className={cn("object-cover transition-transform hover:scale-105", imageClassName)}
                 />
             </button>
 
@@ -69,13 +73,16 @@ export function ImagePreview({ src, alt = "", className, imageClassName }: Image
                         <X className="h-4 w-4" />
                     </button>
                     <div
-                        className="absolute inset-0 flex items-center justify-center p-4"
+                        className="absolute inset-4"
                         onClick={(event) => event.stopPropagation()}
                     >
-                        <img
+                        <Image
                             src={src}
                             alt={alt}
-                            className="h-[calc(100dvh-2rem)] w-[calc(100dvw-2rem)] object-contain"
+                            fill
+                            sizes="100vw"
+                            unoptimized
+                            className="object-contain"
                         />
                     </div>
                 </div>,

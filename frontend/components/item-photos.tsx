@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,14 +36,17 @@ export function ItemPhotos({
             )}>
                 {photos.map((p) => (
                     <div key={p.id} className="group relative">
-                        <img
-                            src={p.url}
+                        <button
+                            type="button"
+                            aria-label="View photo"
                             onClick={() => setSelected(p.url)}
                             className={cn(
-                                "rounded-lg object-cover aspect-square cursor-pointer hover:opacity-90 transition",
+                                "relative block aspect-square w-full overflow-hidden rounded-lg transition hover:opacity-90",
                                 variant === "compact" && "h-20 w-20",
                             )}
-                        />
+                        >
+                            <Image src={p.url} alt="" fill sizes={variant === "compact" ? "80px" : "(min-width: 768px) 33vw, 50vw"} unoptimized className="object-cover" />
+                        </button>
                         {onDelete ? (
                             <button
                                 type="button"
@@ -68,10 +72,9 @@ export function ItemPhotos({
                     onClick={() => setSelected(null)}
                     className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
                 >
-                    <img
-                        src={selected}
-                        className="max-h-[90%] max-w-[90%] rounded-lg"
-                    />
+                    <div className="relative h-[90%] w-[90%]">
+                        <Image src={selected} alt="Selected item photo" fill sizes="90vw" unoptimized className="rounded-lg object-contain" />
+                    </div>
                 </div>
             )}
         </>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Box, Download, Edit3, MapPin, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -346,9 +347,9 @@ export default function KitDetailsPage() {
                         <section className="apple-card rounded-2xl p-4">
                             <div className="grid gap-6 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1fr)]">
                                 <div className="overflow-hidden rounded-2xl border border-border bg-zinc-100">
-                                    <div className="aspect-[4/3]">
+                                    <div className="relative aspect-[4/3]">
                                         {firstPhoto ? (
-                                            <img src={firstPhoto} alt="" className="h-full w-full object-cover" />
+                                            <Image src={firstPhoto} alt={`${container.name} photo`} fill sizes="(min-width: 1024px) 40vw, 100vw" unoptimized className="object-cover" />
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                                                 <Box className="h-16 w-16" />

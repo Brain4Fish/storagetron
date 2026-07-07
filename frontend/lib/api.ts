@@ -75,6 +75,25 @@ export type Location = {
     created_at?: string;
 };
 
+type InventoryRecordRequest = {
+    name: string;
+    description?: string;
+    location_id?: string | null;
+};
+
+type LocationRequest = {
+    name?: string;
+    country?: string;
+    city?: string;
+    room?: string;
+    shelf?: string;
+};
+
+type PhotoUploadRequest = {
+    file_name: string;
+    content_type: string;
+};
+
 type ScanResult = {
     type: "item" | "container";
     item?: Item;
@@ -99,10 +118,23 @@ export type BackupTarget = {
     name: string;
     type: BackupTargetType;
     enabled: boolean;
-    configuration: Record<string, any>;
+    configuration: BackupTargetConfiguration;
     created_at: string;
     updated_at: string;
     deleted_at?: string;
+};
+
+export type BackupTargetConfiguration = {
+    host?: string;
+    port?: number;
+    username?: string;
+    remote_path?: string;
+    password?: string;
+    private_key?: string;
+    passphrase?: string;
+    host_key?: string;
+    insecure_skip_host_key_check?: boolean;
+    [key: string]: unknown;
 };
 
 export type BackupSchedule = {
@@ -207,8 +239,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         if (res.status === 204) return undefined as T;
 
         return res.json();
-    } catch (e: any) {
-        if (e.name === "AbortError") {
+    } catch (e: unknown) {
+        if (e instanceof Error && e.name === "AbortError") {
             throw new ApiError(0, "Request timeout");
         }
         throw e;
@@ -256,9 +288,9 @@ export const api = {
     listItemsPage: ({ limit, offset }: { limit: number; offset: number }) =>
         request<ItemListResponse>(`/items?limit=${limit}&offset=${offset}`),
     getItem: (id: string) => request<Item>(`/items/${id}`),
-    createItem: (data: any) =>
+    createItem: (data: InventoryRecordRequest) =>
         request<Item>("/items", { method: "POST", body: JSON.stringify(data) }),
-    updateItem: (id: string, data: any) =>
+    updateItem: (id: string, data: InventoryRecordRequest) =>
         request<Item>(`/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteItem: (id: string) =>
         request(`/items/${id}`, { method: "DELETE" }),
@@ -268,9 +300,9 @@ export const api = {
         request<void>(`/items/${itemId}/labels/${labelId}`, { method: "DELETE" }),
     listContainers: () => request<Container[]>("/containers"),
     getContainer: (id: string) => request<Container>(`/containers/${id}`),
-    createContainer: (data: any) =>
+    createContainer: (data: InventoryRecordRequest) =>
         request<Container>("/containers", { method: "POST", body: JSON.stringify(data) }),
-    updateContainer: (id: string, data: any) =>
+    updateContainer: (id: string, data: InventoryRecordRequest) =>
         request<Container>(`/containers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteContainer: (id: string) =>
         request<void>(`/containers/${id}`, { method: "DELETE" }),
@@ -285,14 +317,14 @@ export const api = {
         }),
     removeItemFromContainer: (containerId: string, itemId: string) =>
         request<void>(`/containers/${containerId}/items/${itemId}`, { method: "DELETE" }),
-    createPhotoUpload: (id: string, data: any) =>
+    createPhotoUpload: (id: string, data: PhotoUploadRequest) =>
         request<PhotoUpload>(`/items/${id}/photos`, {
             method: "POST",
             body: JSON.stringify(data),
         }),
     deleteItemPhoto: (itemId: string, photoId: string) =>
         request<void>(`/items/${itemId}/photos/${photoId}`, { method: "DELETE" }),
-    createContainerPhotoUpload: (id: string, data: any) =>
+    createContainerPhotoUpload: (id: string, data: PhotoUploadRequest) =>
         request<PhotoUpload>(`/containers/${id}/photos`, {
             method: "POST",
             body: JSON.stringify(data),
@@ -300,9 +332,9 @@ export const api = {
     deleteContainerPhoto: (containerId: string, photoId: string) =>
         request<void>(`/containers/${containerId}/photos/${photoId}`, { method: "DELETE" }),
     listLocations: () => request<Location[]>("/locations"),
-    createLocation: (data: any) =>
+    createLocation: (data: LocationRequest) =>
         request<Location>("/locations", { method: "POST", body: JSON.stringify(data) }),
-    updateLocation: (id: string, data: any) =>
+    updateLocation: (id: string, data: LocationRequest) =>
         request<Location>(`/locations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteLocation: (id: string) =>
         request<void>(`/locations/${id}`, { method: "DELETE" }),

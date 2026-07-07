@@ -43,8 +43,8 @@ export default function ItemsPage() {
     const itemsQuery = useQuery({ queryKey: ["items"], queryFn: api.listItems });
     const containersQuery = useQuery({ queryKey: ["containers"], queryFn: api.listContainers });
     const labelsQuery = useQuery({ queryKey: ["labels"], queryFn: api.listLabels });
-    const items = itemsQuery.data ?? [];
-    const containers = containersQuery.data ?? [];
+    const items = useMemo(() => itemsQuery.data ?? [], [itemsQuery.data]);
+    const containers = useMemo(() => containersQuery.data ?? [], [containersQuery.data]);
     const labels = labelsQuery.data ?? [];
 
     const rows = useMemo(() => buildItemRows(items, containers), [items, containers]);

@@ -126,10 +126,10 @@ export default function BackupsPage() {
         refetchInterval: 5000,
     });
 
-    const targets = targetsQuery.data ?? [];
-    const schedules = schedulesQuery.data ?? [];
-    const backupRuns = backupRunsQuery.data ?? [];
-    const restoreRuns = restoreRunsQuery.data ?? [];
+    const targets = useMemo(() => targetsQuery.data ?? [], [targetsQuery.data]);
+    const schedules = useMemo(() => schedulesQuery.data ?? [], [schedulesQuery.data]);
+    const backupRuns = useMemo(() => backupRunsQuery.data ?? [], [backupRunsQuery.data]);
+    const restoreRuns = useMemo(() => restoreRunsQuery.data ?? [], [restoreRunsQuery.data]);
     const targetByID = useMemo(() => new Map(targets.map((target) => [target.id, target])), [targets]);
     const scheduleByID = useMemo(() => new Map(schedules.map((schedule) => [schedule.id, schedule])), [schedules]);
     const enabledTargets = useMemo(() => targets.filter((target) => target.enabled), [targets]);
