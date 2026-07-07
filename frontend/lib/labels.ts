@@ -30,3 +30,10 @@ export function labelSelectionDiff(current: InventoryLabel[], selectedIds: strin
         detach: current.filter((label) => !selected.has(label.id)).map((label) => label.id),
     };
 }
+
+export function matchesSelectedLabels(labels: InventoryLabel[] | undefined, selectedIds: string[]) {
+    if (selectedIds.length === 0) return true;
+
+    const labelIds = new Set((labels ?? []).map((label) => label.id));
+    return selectedIds.every((id) => labelIds.has(id));
+}

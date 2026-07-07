@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Download, Filter, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, Download, Filter, Plus, Search, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, Item } from "@/lib/api";
+import { api, InventoryLabel, Item } from "@/lib/api";
 import { buildItemRows } from "@/lib/inventory-view";
+import { LABEL_COLORS, matchesSelectedLabels } from "@/lib/labels";
+import { cn } from "@/lib/utils";
 import { downloadSelectedAssetsXlsx } from "@/lib/export-assets";
 import { PageShell } from "@/components/page-shell";
 import { ItemsTable } from "@/components/table/items-table";
@@ -24,11 +25,13 @@ type DeleteRequest = {
 export default function ItemsPage() {
     const queryClient = useQueryClient();
     const [open, setOpen] = useState(false);
+    const [filtersExpanded, setFiltersExpanded] = useState(false);
     const [page, setPage] = useState(0);
     const [query, setQuery] = useState("");
     const [locationFilter, setLocationFilter] = useState("all");
     const [containerFilter, setContainerFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState("");
@@ -39,8 +42,10 @@ export default function ItemsPage() {
 
     const itemsQuery = useQuery({ queryKey: ["items"], queryFn: api.listItems });
     const containersQuery = useQuery({ queryKey: ["containers"], queryFn: api.listContainers });
+    const labelsQuery = useQuery({ queryKey: ["labels"], queryFn: api.listLabels });
     const items = itemsQuery.data ?? [];
     const containers = containersQuery.data ?? [];
+    const labels = labelsQuery.data ?? [];
 
     const rows = useMemo(() => buildItemRows(items, containers), [items, containers]);
     const locationOptions = useMemo(() => Array.from(new Set(rows.map((row) => row.locationLabel))).sort(), [rows]);
@@ -53,9 +58,10 @@ export default function ItemsPage() {
             if (locationFilter !== "all" && row.locationLabel !== locationFilter) return false;
             if (containerFilter !== "all" && row.containerLabel !== containerFilter) return false;
             if (statusFilter !== "all" && row.status !== statusFilter) return false;
+            if (!matchesSelectedLabels(row.item.labels, selectedLabelIds)) return false;
             return true;
         });
-    }, [containerFilter, locationFilter, query, rows, statusFilter]);
+    }, [containerFilter, locationFilter, query, rows, selectedLabelIds, statusFilter]);
 
     const totalItems = filteredRows.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PAGE_SIZE));
@@ -65,6 +71,12 @@ export default function ItemsPage() {
     const canGoPrevious = page > 0;
     const canGoNext = page + 1 < totalPages;
     const selectedCount = selectedItemIds.size;
+    const activeFilterCount = [
+        query.trim() !== "",
+        locationFilter !== "all",
+        containerFilter !== "all",
+        statusFilter !== "all",
+    ].filter(Boolean).length + selectedLabelIds.length;
 
     const selectedItems = useMemo(
         () => rows.filter((row) => selectedItemIds.has(row.item.id)),
@@ -73,7 +85,7 @@ export default function ItemsPage() {
 
     useEffect(() => {
         setPage(0);
-    }, [containerFilter, locationFilter, query, statusFilter]);
+    }, [containerFilter, locationFilter, query, selectedLabelIds, statusFilter]);
 
     useEffect(() => {
         if (new URLSearchParams(window.location.search).get("status") === "loose") {
@@ -117,6 +129,7 @@ export default function ItemsPage() {
         setLocationFilter("all");
         setContainerFilter("all");
         setStatusFilter("all");
+        setSelectedLabelIds([]);
     };
     const goToPreviousPage = () => setPage((current) => Math.max(0, current - 1));
     const goToNextPage = () => setPage((current) => Math.min(totalPages - 1, current + 1));
@@ -222,39 +235,59 @@ export default function ItemsPage() {
                     </div>
                 </header>
 
-                <section className="apple-card rounded-2xl p-4">
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-                        <label className="relative block">
+                <section className="apple-card overflow-visible rounded-2xl p-3">
+                    <div className={cn("grid gap-3", filtersExpanded && "lg:grid-cols-[minmax(0,1fr)_auto]")}>
+                        <div className="relative">
                             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Search items by name, description, barcode, or note..."
-                                className="h-11 w-full rounded-xl border border-border bg-white pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                placeholder="Search items, containers, locations, or labels..."
+                                className="h-10 w-full rounded-xl border border-border bg-white pl-10 pr-16 text-sm outline-none focus:ring-2 focus:ring-ring"
                             />
-                        </label>
-                        <Button variant="outline" onClick={clearFilters}>
-                            <Filter className="h-4 w-4" />
-                            Clear filters
-                        </Button>
-                    </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                        <FilterSelect label="Location" value={locationFilter} onChange={setLocationFilter} options={locationOptions} />
-                        <FilterSelect label="Container" value={containerFilter} onChange={setContainerFilter} options={containerOptions} />
-                        <FilterSelect
-                            label="Status"
-                            value={statusFilter}
-                            onChange={setStatusFilter}
-                            options={["stored", "loose"]}
-                            labels={{ stored: "In Storage", loose: "No Container" }}
-                        />
-                        <div className="grid gap-1 text-xs font-medium text-muted-foreground">
-                            Containers
-                            <Link href="/containers">
-                                <Button variant="outline" className="h-10 w-full">Browse Containers</Button>
-                            </Link>
+                            <button
+                                type="button"
+                                className="absolute right-1 top-1/2 flex h-8 -translate-y-1/2 items-center gap-1 rounded-lg px-2 text-muted-foreground outline-none transition hover:bg-zinc-100 hover:text-zinc-950 focus-visible:ring-2 focus-visible:ring-ring"
+                                aria-label={filtersExpanded ? "Hide filters" : "Show filters"}
+                                aria-expanded={filtersExpanded}
+                                aria-controls="items-search-filters"
+                                onClick={() => setFiltersExpanded((current) => !current)}
+                            >
+                                {activeFilterCount > 0 ? (
+                                    <span className="min-w-5 rounded-md bg-indigo-50 px-1.5 py-0.5 text-center text-xs font-medium text-primary">
+                                        {activeFilterCount}
+                                    </span>
+                                ) : null}
+                                <ChevronDown className={cn("h-4 w-4 transition", filtersExpanded && "rotate-180")} aria-hidden="true" />
+                            </button>
                         </div>
+                        {filtersExpanded ? (
+                            <Button variant="outline" className="h-10" onClick={clearFilters}>
+                                <Filter className="h-4 w-4" />
+                                Clear filters
+                            </Button>
+                        ) : null}
                     </div>
+                    {filtersExpanded ? (
+                        <div id="items-search-filters" className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                            <FilterSelect label="Location" value={locationFilter} onChange={setLocationFilter} options={locationOptions} />
+                            <FilterSelect label="Container" value={containerFilter} onChange={setContainerFilter} options={containerOptions} />
+                            <LabelFilter
+                                labels={labels}
+                                selectedIds={selectedLabelIds}
+                                isLoading={labelsQuery.isLoading}
+                                hasError={labelsQuery.isError}
+                                onChange={setSelectedLabelIds}
+                            />
+                            <FilterSelect
+                                label="Status"
+                                value={statusFilter}
+                                onChange={setStatusFilter}
+                                options={["stored", "loose"]}
+                                labels={{ stored: "In Storage", loose: "No Container" }}
+                            />
+                        </div>
+                    ) : null}
                 </section>
 
                 {selectedCount > 0 ? (
@@ -329,6 +362,104 @@ export default function ItemsPage() {
                 This permanently deletes <span className="font-semibold text-zinc-950">{deleteRequest?.subject}</span>, including photos and labels.
             </DeleteConfirmationDialog>
         </PageShell>
+    );
+}
+
+function LabelFilter({
+    labels,
+    selectedIds,
+    isLoading,
+    hasError,
+    onChange,
+}: {
+    labels: InventoryLabel[];
+    selectedIds: string[];
+    isLoading: boolean;
+    hasError: boolean;
+    onChange: (ids: string[]) => void;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const rootRef = useRef<HTMLDivElement>(null);
+    const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const closeOnOutsideClick = (event: MouseEvent) => {
+            if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+        };
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setIsOpen(false);
+        };
+
+        document.addEventListener("mousedown", closeOnOutsideClick);
+        document.addEventListener("keydown", closeOnEscape);
+        return () => {
+            document.removeEventListener("mousedown", closeOnOutsideClick);
+            document.removeEventListener("keydown", closeOnEscape);
+        };
+    }, [isOpen]);
+
+    const buttonLabel = isLoading
+        ? "Loading..."
+        : hasError
+            ? "Unavailable"
+            : selectedIds.length === 0
+                ? "All"
+                : `${selectedIds.length} selected`;
+    const isDisabled = isLoading || hasError || labels.length === 0;
+
+    const toggleLabel = (labelId: string) => {
+        onChange(selected.has(labelId)
+            ? selectedIds.filter((id) => id !== labelId)
+            : [...selectedIds, labelId]);
+    };
+
+    return (
+        <div ref={rootRef} className="relative grid gap-1 text-xs font-medium text-muted-foreground">
+            <span>Labels</span>
+            <button
+                type="button"
+                className="flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-border bg-white px-3 text-left text-sm font-normal text-zinc-950 outline-none transition hover:bg-zinc-50 focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                aria-haspopup="listbox"
+                aria-expanded={isOpen}
+                disabled={isDisabled}
+                onClick={() => setIsOpen((current) => !current)}
+            >
+                <span className="truncate">{labels.length === 0 && !isLoading && !hasError ? "No labels" : buttonLabel}</span>
+                <ChevronDown className={cn("h-4 w-4 shrink-0 transition", isOpen && "rotate-180")} aria-hidden="true" />
+            </button>
+            {isOpen ? (
+                <div
+                    role="listbox"
+                    aria-label="Filter by labels"
+                    aria-multiselectable="true"
+                    className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 min-w-56 overflow-y-auto rounded-xl border border-border bg-white p-1.5 shadow-lg"
+                >
+                    {labels.map((label) => {
+                        const isSelected = selected.has(label.id);
+                        const color = LABEL_COLORS.find((option) => option.value === label.color);
+                        return (
+                            <button
+                                key={label.id}
+                                type="button"
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => toggleLabel(label.id)}
+                                className={cn(
+                                    "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-normal text-zinc-950 outline-none transition hover:bg-zinc-50 focus:bg-zinc-50 focus:ring-2 focus:ring-inset focus:ring-ring",
+                                    isSelected && "bg-indigo-50",
+                                )}
+                            >
+                                <span className={cn("h-3 w-3 shrink-0 rounded-full", color?.dot ?? "bg-blue-500")} />
+                                <span className="min-w-0 flex-1 truncate">{label.name}</span>
+                                {isSelected ? <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> : null}
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : null}
+        </div>
     );
 }
 
