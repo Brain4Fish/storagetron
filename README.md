@@ -388,11 +388,13 @@ GitHub Actions runs on self-hosted runners with the `k8s-runners` label.
 
 The main workflow is `.github/workflows/ci.yml`:
 
-- Pull requests into `main` run linter, tests, backend container build, frontend container build, and the aggregate `PR gate`. Pull requests do not push images.
-- Pushes to `main` run the same checks automatically, push `main` and `sha-*` images to GitHub Container Registry, and finish with `Main gate`.
+- Pull requests into `main` detect changed components first. Backend-only and frontend-only changes run only their matching checks and container build, while documentation-only changes skip both. The aggregate `PR gate` remains the required check, and pull requests do not push images.
+- Backend checks run formatting, vet, and Go tests after a single Go setup. Frontend checks install dependencies once, then run lint and tests.
+- Pushes to `main` always run both component pipelines, push `main` and `sha-*` images to GitHub Container Registry, and finish with `Main gate`.
 - Version tags matching `v*.*.*` build both images without pushing, wait for the `release` environment approval, then push release tags to GitHub Container Registry.
 
-Container builds use Docker Buildx on the dedicated `k8s-builder-runners` ARC scale set. Keep lint, test, and gate jobs on the regular `k8s-runners` label so only image builds use the builder runner pool.
+Container builds use Docker Buildx on the dedicated `k8s-builder-runners` ARC scale set. Keep component checks and gate jobs on the regular `k8s-runners` label so only image builds use the builder runner pool.
+BuildKit caches for the API and web images use separate GitHub Actions cache scopes. The web image also persists the Next.js compiler cache between compatible builds.
 
 Published images:
 

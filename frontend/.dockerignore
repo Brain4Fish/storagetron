@@ -1,8 +1,8 @@
 node_modules
 .next
+.build-cache
 npm-debug.log*
 .env.local
 .env.*.local
 Dockerfile
 .dockerignore
-

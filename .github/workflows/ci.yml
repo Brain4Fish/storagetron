@@ -20,11 +20,9 @@ permissions:
   contents: read
   packages: write
 
-# TODO: uncomment this after merge https://github.com/Brain4Fish/storagetron/pull/1
-# because job stuck in queued state
-#concurrency:
-#  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-#  cancel-in-progress: true
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
 
 env:
   GOFLAGS: -mod=readonly
@@ -32,13 +30,67 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
-  lint:
-    name: Linter
+  changes:
+    name: Select changed components
     runs-on: k8s-runners
-    env:
-      GOCACHE: ${{ github.workspace }}/.cache/go-build
-      GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
-    timeout-minutes: 10
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.select.outputs.backend }}
+      frontend: ${{ steps.select.outputs.frontend }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Select components
+        id: select
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          backend=false
+          frontend=false
+
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            backend=true
+            frontend=true
+          else
+            changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+
+            while IFS= read -r file; do
+              case "$file" in
+                .github/*|charts/*|deploy/*|docker-compose.yml)
+                  backend=true
+                  frontend=true
+                  ;;
+                cmd/*|internal/*|pkg/*|migrations/*|go.mod|go.sum|Dockerfile|.dockerignore)
+                  backend=true
+                  ;;
+                frontend/*)
+                  frontend=true
+                  ;;
+              esac
+            done <<< "$changed_files"
+          fi
+
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Selected components"
+            echo "- Backend: \`$backend\`"
+            echo "- Frontend: \`$frontend\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  backend-checks:
+    name: Backend checks
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    needs: changes
+    runs-on: k8s-runners
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -47,7 +99,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
       - name: Check Go formatting
         shell: bash
@@ -62,12 +114,24 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
+      - name: Run backend tests
+        run: go test ./...
+
+  frontend-checks:
+    name: Frontend checks
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    needs: changes
+    runs-on: k8s-runners
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          package-manager-cache: false
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -77,43 +141,14 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
-  test:
-    name: Tests
-    runs-on: k8s-runners
-    env:
-      GOCACHE: ${{ github.workspace }}/.cache/go-build
-      GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Run backend tests
-        run: go test ./...
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
       - name: Run frontend tests
         working-directory: frontend
         run: npm run test
 
   build-backend-image:
     name: Build backend image
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    needs: changes
     runs-on: k8s-builder-runners
     timeout-minutes: 20
     steps:
@@ -148,6 +183,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build backend image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -155,13 +191,27 @@ jobs:
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=storagetron-api-v1
+          cache-to: type=gha,scope=storagetron-api-v1,mode=max,ignore-error=true
           build-args: |
             APP_VERSION=${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
             APP_COMMIT=${{ github.sha }}
             APP_BUILD_DATE=${{ github.event.head_commit.timestamp || 'unknown' }}
 
+      - name: Summarize backend image
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          {
+            echo "### Backend image cache"
+            echo "- BuildKit scope: \`storagetron-api-v1\`"
+            echo "- Result: \`${{ steps.build.outcome }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build-frontend-image:
     name: Build frontend image
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    needs: changes
     runs-on: k8s-builder-runners
     timeout-minutes: 20
     steps:
@@ -193,9 +243,33 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Docker Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Restore Next.js compiler cache
+        id: next-cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/.build-cache/next
+          key: next-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('frontend/package-lock.json') }}-${{ hashFiles('frontend/package.json', 'frontend/*.json', 'frontend/**/*.js', 'frontend/**/*.mjs', 'frontend/**/*.ts', 'frontend/**/*.tsx', 'frontend/**/*.css', 'frontend/public/**') }}
+          restore-keys: |
+            next-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('frontend/package-lock.json') }}-
+
+      - name: Restore Docker cache mounts
+        uses: reproducible-containers/buildkit-cache-dance@5422eac04292c961a382e0f584ea0f03ad9da723 # v3.4.0
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-map: |
+            {
+              "frontend/.build-cache/next": {
+                "target": "/app/.next/cache",
+                "id": "storagetron-next-v1"
+              }
+            }
+          skip-extraction: ${{ steps.next-cache.outputs.cache-hit }}
+
       - name: Build frontend image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: frontend
@@ -203,17 +277,31 @@ jobs:
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=storagetron-web-v1
+          cache-to: type=gha,scope=storagetron-web-v1,mode=max,ignore-error=true
           build-args: |
             WEB_VERSION=${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
             WEB_COMMIT=${{ github.sha }}
             API_PROXY_TARGET=http://localhost:8086
 
+      - name: Summarize frontend image
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          {
+            echo "### Frontend image caches"
+            echo "- BuildKit scope: \`storagetron-web-v1\`"
+            echo "- Exact Next.js cache hit: \`${{ steps.next-cache.outputs.cache-hit == 'true' }}\`"
+            echo "- Result: \`${{ steps.build.outcome }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   pr-gate:
     name: PR gate
     if: ${{ always() && github.event_name == 'pull_request' }}
     needs:
-      - lint
-      - test
+      - changes
+      - backend-checks
+      - frontend-checks
       - build-backend-image
       - build-frontend-image
     runs-on: k8s-runners
@@ -232,8 +320,9 @@ jobs:
     name: Main gate
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs:
-      - lint
-      - test
+      - changes
+      - backend-checks
+      - frontend-checks
       - build-backend-image
       - build-frontend-image
     runs-on: k8s-runners
@@ -252,8 +341,9 @@ jobs:
     name: Release checks
     if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))) }}
     needs:
-      - lint
-      - test
+      - changes
+      - backend-checks
+      - frontend-checks
       - build-backend-image
       - build-frontend-image
     runs-on: k8s-runners
@@ -299,6 +389,7 @@ jobs:
           - name: api
             context: .
             file: Dockerfile
+            cache-scope: storagetron-api-v1
             build-args: |
               APP_VERSION=${{ github.ref_name }}
               APP_COMMIT=${{ github.sha }}
@@ -306,6 +397,7 @@ jobs:
           - name: web
             context: frontend
             file: frontend/Dockerfile
+            cache-scope: storagetron-web-v1
             build-args: |
               WEB_VERSION=${{ github.ref_name }}
               WEB_COMMIT=${{ github.sha }}
@@ -346,4 +438,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.cache-scope }}
+          cache-to: type=gha,scope=${{ matrix.cache-scope }},mode=max,ignore-error=true
           build-args: ${{ matrix.build-args }}
