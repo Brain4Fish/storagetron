@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
@@ -8,10 +10,12 @@ ARG APP_BUILD_DATE=unknown
 
 RUN apk add --no-cache git
 
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+COPY cmd ./cmd
+COPY internal ./internal
+COPY pkg ./pkg
 
 RUN CGO_ENABLED=0 go build \
     -ldflags "-X github.com/Brain4Fish/storagetron/internal/version.Version=${APP_VERSION} -X github.com/Brain4Fish/storagetron/internal/version.Commit=${APP_COMMIT} -X github.com/Brain4Fish/storagetron/internal/version.Date=${APP_BUILD_DATE}" \
