@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Box, Download, Edit3, MapPin, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, Item } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { downloadInventoryRowsXlsx, downloadSelectedAssetsXlsx } from "@/lib/export-assets";
 import { formatLocation } from "@/lib/location";
 import { PageShell } from "@/components/page-shell";
@@ -20,13 +20,14 @@ import { EditRecordDialog } from "@/components/forms/edit-record-dialog";
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import { LabelList } from "@/components/labels/label-chip";
 import { labelSelectionDiff } from "@/lib/labels";
+import { AddItemsToContainerDialog } from "@/components/add-items-to-container-dialog";
 
 export default function KitDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const queryClient = useQueryClient();
     const id = params.id as string;
-    const [selectedItemId, setSelectedItemId] = useState("");
+    const [addItemsOpen, setAddItemsOpen] = useState(false);
     const [error, setError] = useState("");
     const [editOpen, setEditOpen] = useState(false);
     const [editError, setEditError] = useState("");
@@ -74,31 +75,6 @@ export default function KitDetailsPage() {
     );
     const selectedCount = selectedItemIds.size;
     const selectedLabelIds = useMemo(() => (containerQuery.data?.labels ?? []).map((label) => label.id), [containerQuery.data?.labels]);
-
-    const availableItems = useMemo(() => {
-        const assignedItems = new Set(
-            (containersQuery.data ?? []).flatMap((container) =>
-                (container.items ?? []).map((item) => item.id),
-            ),
-        );
-
-        return (itemsQuery.data ?? []).filter((item) => !assignedItems.has(item.id));
-    }, [itemsQuery.data, containersQuery.data]);
-
-    const addMutation = useMutation({
-        mutationFn: (itemId: string) => api.addItemToContainer(id, itemId),
-        onSuccess: async () => {
-            setSelectedItemId("");
-            setError("");
-            await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ["container", id] }),
-                queryClient.invalidateQueries({ queryKey: ["containers"] }),
-            ]);
-        },
-        onError: (err) => {
-            setError(err instanceof ApiError ? err.message : "Failed to add item");
-        },
-    });
 
     const updateMutation = useMutation({
         mutationFn: async (payload: { name: string; description: string; location_id?: string | null; label_ids?: string[] }) => {
@@ -172,15 +148,6 @@ export default function KitDetailsPage() {
             setDeleteError(err instanceof ApiError ? err.message : "Failed to delete container");
         },
     });
-
-    const addSelectedItem = () => {
-        if (!selectedItemId) {
-            setError("Choose an item to add");
-            return;
-        }
-        setError("");
-        addMutation.mutate(selectedItemId);
-    };
 
     const toggleKitItem = (itemId: string) => {
         setSelectedItemIds((current) => {
@@ -407,24 +374,10 @@ export default function KitDetailsPage() {
                                     <h2 className="text-lg font-semibold">Contents</h2>
                                     <p className="text-sm text-muted-foreground">{kitItems.length} items in this container</p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <select
-                                        value={selectedItemId}
-                                        onChange={(event) => setSelectedItemId(event.target.value)}
-                                        className="h-10 min-w-0 rounded-xl border border-border bg-white px-3 text-sm"
-                                    >
-                                        <option value="">Choose item</option>
-                                        {availableItems.map((item: Item) => (
-                                            <option key={item.id} value={item.id}>
-                                                {item.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <Button onClick={addSelectedItem} disabled={addMutation.isPending}>
-                                        <Plus className="h-4 w-4" />
-                                        {addMutation.isPending ? "Adding..." : "Add"}
-                                    </Button>
-                                </div>
+                                <Button onClick={() => setAddItemsOpen(true)}>
+                                    <Plus className="h-4 w-4" />
+                                    Add
+                                </Button>
                             </div>
                             {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
                             <div className="space-y-3">
@@ -533,6 +486,17 @@ export default function KitDetailsPage() {
                 </aside>
             </div>
             </div>
+
+            <AddItemsToContainerDialog
+                open={addItemsOpen}
+                onOpenChange={setAddItemsOpen}
+                containerId={id}
+                containerName={container.name}
+                items={itemsQuery.data ?? []}
+                containers={containersQuery.data ?? []}
+                isLoading={itemsQuery.isLoading || containersQuery.isLoading}
+                loadError={itemsQuery.isError || containersQuery.isError ? "Refresh the page and try again." : ""}
+            />
 
             <EditRecordDialog
                 open={editOpen}
