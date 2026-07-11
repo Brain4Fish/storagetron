@@ -100,7 +100,9 @@ type ScanResult = {
     container?: Container;
 };
 
-type PhotoUpload = {
+export type PhotoUpload = {
+    photo_id: string;
+    object_key: string;
     upload_url: string;
 };
 

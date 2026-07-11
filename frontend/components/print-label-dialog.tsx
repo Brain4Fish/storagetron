@@ -19,6 +19,7 @@ type Props = {
     detailLabel: string;
     onDownloadXlsx?: () => void;
     isDownloadingXlsx?: boolean;
+    onPrint?: () => void;
 };
 
 function fitDetail(value: string) {
@@ -68,7 +69,7 @@ function downloadUrl(url: string, filename: string) {
     link.click();
 }
 
-export function PrintLabelDialog({ name, qrValue, detail, detailLabel, onDownloadXlsx, isDownloadingXlsx }: Props) {
+export function PrintLabelDialog({ name, qrValue, detail, detailLabel, onDownloadXlsx, isDownloadingXlsx, onPrint }: Props) {
     const [open, setOpen] = useState(false);
     const svgRef = useRef<SVGSVGElement | null>(null);
     const title = fitTitle(name);
@@ -195,7 +196,7 @@ export function PrintLabelDialog({ name, qrValue, detail, detailLabel, onDownloa
                         </svg>
 
                         <div className="no-print flex flex-wrap justify-center gap-2">
-                            <Button onClick={() => window.print()}>
+                            <Button onClick={() => { onPrint?.(); window.print(); }}>
                                 <Printer className="h-4 w-4" />
                                 Print label
                             </Button>
