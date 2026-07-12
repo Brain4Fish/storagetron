@@ -100,7 +100,7 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
 
             <div className="apple-card hidden overflow-hidden rounded-2xl md:block">
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[920px] text-sm">
+                    <table className="w-full min-w-[1120px] text-sm">
                         <thead className="bg-zinc-50 text-xs font-medium text-muted-foreground">
                             <tr>
                                 <th className="w-12 px-4 py-3 text-left">
@@ -159,8 +159,8 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-zinc-700">{row.locationLabel}</td>
-                                    <td className="px-4 py-3">
+                                    <td className="whitespace-nowrap px-4 py-3 text-zinc-700">{row.locationLabel}</td>
+                                    <td className="whitespace-nowrap px-4 py-3">
                                         {row.container ? (
                                             <Link href={`/containers/${row.container.id}`} className="font-medium text-primary hover:underline">
                                                 {row.containerLabel}
@@ -170,11 +170,11 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                         )}
                                     </td>
                                     <td className="max-w-64 px-4 py-3"><LabelList labels={row.item.labels} empty="—" /></td>
-                                    <td className="px-4 py-3">
+                                    <td className="whitespace-nowrap px-4 py-3">
                                         <span className={statusClass(row.status)}>{itemStatusLabel(row.status)}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-muted-foreground">{formatDate(row.item.created_at)}</td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{formatDate(row.item.created_at)}</td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-right">
                                         <div className="flex justify-end gap-1">
                                             {onDeleteItem ? (
                                                 <Button
@@ -204,8 +204,8 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
 
 function statusClass(status: ItemRowView["status"]) {
     if (status === "stored") {
-        return "status-pill bg-emerald-50 text-emerald-700";
+        return "status-pill whitespace-nowrap bg-emerald-50 text-emerald-700";
     }
 
-    return "status-pill bg-amber-50 text-amber-700";
+    return "status-pill whitespace-nowrap bg-amber-50 text-amber-700";
 }
