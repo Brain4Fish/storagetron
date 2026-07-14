@@ -1,11 +1,12 @@
-import { api } from "@/lib/api";
-import { effectiveItemLocation, formatLocation } from "@/lib/location";
+import { api, type InventoryLabel } from "./api";
+import { effectiveItemLocation, formatLocation } from "./location";
 
 type InventoryExportRow = {
     name: string;
     id: string;
     link: string;
     location?: string;
+    labels?: InventoryLabel[];
 };
 
 type ZipFile = {
@@ -14,6 +15,29 @@ type ZipFile = {
 };
 
 const textEncoder = new TextEncoder();
+
+export function mergeExportLabels(...groups: Array<InventoryLabel[] | undefined>) {
+    const seen = new Set<string>();
+
+    return groups.flatMap((group) => (group ?? []).filter((label) => {
+        if (seen.has(label.id)) return false;
+        seen.add(label.id);
+        return true;
+    }));
+}
+
+export function buildInventoryWorksheetRows(rows: InventoryExportRow[]) {
+    return [
+        ["Name", "UUID", "Link", "Location", "Labels"],
+        ...rows.map((row) => [
+            row.name,
+            row.id,
+            row.link,
+            row.location ?? "",
+            mergeExportLabels(row.labels).map((label) => label.name).join(", "),
+        ]),
+    ];
+}
 
 function sanitizeFilename(filename: string) {
     const safeFilename = filename.replace(/[\\/:*?"<>|]+/g, "-");
@@ -174,6 +198,8 @@ function worksheetXml(rows: string[][]) {
         <col min="1" max="1" width="32" customWidth="1"/>
         <col min="2" max="2" width="40" customWidth="1"/>
         <col min="3" max="3" width="64" customWidth="1"/>
+        <col min="4" max="4" width="32" customWidth="1"/>
+        <col min="5" max="5" width="40" customWidth="1"/>
     </cols>
     <sheetData>${sheetRows}</sheetData>
 </worksheet>`;
@@ -257,13 +283,7 @@ export function downloadInventoryRowsXlsx(
         throw new Error("Choose at least one row to export.");
     }
 
-    downloadXlsx(
-        filename,
-        [
-            ["Name", "UUID", "Link", "Location"],
-            ...rows.map((row) => [row.name, row.id, row.link, row.location ?? ""]),
-        ],
-    );
+    downloadXlsx(filename, buildInventoryWorksheetRows(rows));
     return rows.length;
 }
 
@@ -286,6 +306,7 @@ export async function downloadSelectedAssetsXlsx(itemIds: Iterable<string>, file
             id: item.id,
             link: `${window.location.origin}/items/${item.id}`,
             location: formatLocation(effectiveItemLocation(item)),
+            labels: item.labels,
         })),
         filename,
     );
@@ -310,6 +331,7 @@ export async function downloadSelectedKitsXlsx(containerIds: Iterable<string>, f
             id: container.id,
             link: `${window.location.origin}/containers/${container.id}`,
             location: formatLocation(container.location),
+            labels: mergeExportLabels(container.labels, container.inherited_labels),
         })),
         filename,
     );

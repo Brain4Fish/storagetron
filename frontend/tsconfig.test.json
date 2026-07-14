@@ -13,6 +13,7 @@
   },
   "include": [
     "lib/api.ts",
+    "lib/export-assets.ts",
     "lib/item-entry.ts",
     "lib/location.ts",
     "lib/scan.ts",
