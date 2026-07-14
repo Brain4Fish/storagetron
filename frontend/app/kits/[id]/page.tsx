@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Box, Download, Edit3, MapPin, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import { downloadInventoryRowsXlsx, downloadSelectedAssetsXlsx } from "@/lib/export-assets";
+import { downloadInventoryRowsXlsx, downloadSelectedAssetsXlsx, mergeExportLabels } from "@/lib/export-assets";
 import { formatLocation } from "@/lib/location";
 import { PageShell } from "@/components/page-shell";
 import { QRCode } from "@/components/qr/qr-code";
@@ -211,6 +211,7 @@ export default function KitDetailsPage() {
                         id: kit.id,
                         link: `${window.location.origin}/containers/${kit.id}`,
                         location: formatLocation(kit.location),
+                        labels: mergeExportLabels(kit.labels, kit.inherited_labels),
                     },
                 ],
                 `${kit.name}-container.xlsx`,
