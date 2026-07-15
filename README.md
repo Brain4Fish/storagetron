@@ -118,14 +118,14 @@ The API requires these environment variables:
 | `BACKUP_SECRET_KEY` | Secret used to encrypt backup target configuration. Keep it stable. |
 | `BACKUP_TEMP_DIR` | Optional temp directory for backup artifacts. |
 
-The web app proxies same-origin `/api/*` requests to the Go API. During local frontend development it defaults to `http://localhost:8086`. Override it with:
+The web app has a runtime same-origin `/api/*` proxy for local development and server-side work such as Next.js image optimization. It defaults to `http://localhost:8086`; override it with an API origin that does not include an `/api` path:
 
 ```bash
 cd frontend
 API_PROXY_TARGET=http://localhost:8080 npm run dev
 ```
 
-The same target is read by the web server at runtime when Next.js optimizes stable photo URLs. The Helm chart automatically points it at the API service for the current release.
+The proxy preserves the `/api` prefix when forwarding requests. In Kubernetes, ingress normally sends browser `/api/*` requests directly to the API service, while `/_next/image` reaches the web service and uses this runtime proxy to fetch the original photo. The Helm chart automatically points `API_PROXY_TARGET` at the API service for the current release. Changing it requires a web pod restart, not an image rebuild.
 
 Mobile camera scanning requires a secure context. It works on `localhost`, but phones opening the app through a LAN address usually need HTTPS before the browser will grant camera access.
 

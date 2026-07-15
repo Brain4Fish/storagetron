@@ -15,24 +15,26 @@ npm run dev
 The web UI calls the backend through the same-origin `/api` path. In Kubernetes,
 route `/api` to the backend service and all other paths to this web service.
 
-For local frontend development, Next.js rewrites `/api/*` to the backend. By
-default it proxies to `http://localhost:8086`, matching the root
-`docker-compose.yml` port mapping. Override it with:
+For local frontend development, a runtime Next.js route proxies `/api/*` to the
+backend. By default it uses `http://localhost:8086`, matching the root
+`docker-compose.yml` port mapping. Override it with an API origin that does not
+include an `/api` path:
 
 ```bash
 API_PROXY_TARGET=http://localhost:8080 npm run dev
 ```
 
-The photo optimizer also uses `API_PROXY_TARGET` at runtime through the local
-`/api/photos/:photo_id/content` route. Kubernetes deployments must set it to an
-API address reachable from the web pod; the Storagetron Helm chart does this
-automatically with the release-specific API service name.
+The proxy preserves the `/api` prefix and supports all API methods. The Next.js
+photo optimizer uses the same route when fetching `/api/photos/:photo_id/content`.
+Kubernetes deployments must set `API_PROXY_TARGET` to an API origin reachable
+from the web pod; the Storagetron Helm chart does this automatically with the
+release-specific API service name.
 
-When running the web UI from Docker Compose, the image must be rebuilt after
-changing `API_PROXY_TARGET` because Next.js includes rewrites during the build:
+`API_PROXY_TARGET` is evaluated when the web server handles a request, so a
+configuration change only requires restarting the web container or pod:
 
 ```bash
-docker compose up --build web
+docker compose restart web
 ```
 
 ## Mobile camera scanning

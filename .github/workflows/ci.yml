@@ -282,7 +282,6 @@ jobs:
           build-args: |
             WEB_VERSION=${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
             WEB_COMMIT=${{ github.sha }}
-            API_PROXY_TARGET=http://localhost:8086
 
       - name: Summarize frontend image
         if: ${{ always() }}
@@ -401,7 +400,6 @@ jobs:
             build-args: |
               WEB_VERSION=${{ github.ref_name }}
               WEB_COMMIT=${{ github.sha }}
-              API_PROXY_TARGET=http://localhost:8086
     steps:
       - name: Checkout
         uses: actions/checkout@v5

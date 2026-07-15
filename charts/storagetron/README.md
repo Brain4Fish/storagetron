@@ -73,7 +73,7 @@ ingress:
           service: api
 ```
 
-The web app uses `web.nextPublicApiUrl` for browser-side API calls. Set it to the API URL users can reach through ingress or a load balancer. The web server uses `web.apiProxyTarget` for runtime image optimization; leave it empty to target the API service from the same Helm release.
+The web UI uses the canonical same-origin `/api` path for browser calls. `web.nextPublicApiUrl` is still rendered for compatibility with older images. The web server uses `web.apiProxyTarget` as an origin for its runtime `/api` proxy; do not include an `/api` suffix. Leave it empty to target the API service from the same Helm release.
 
 ## S3 And Photo Uploads
 
@@ -144,11 +144,11 @@ All key names can be changed under `secret.keys`.
 | `web.image.repository` | `storagetron-web` | Web image repository. |
 | `web.image.tag` | `latest` | Web image tag. Prefer immutable tags in production. |
 | `web.image.pullPolicy` | `IfNotPresent` | Web image pull policy. |
-| `web.apiProxyTarget` | release API service URL | Runtime API target used by the Next.js photo optimizer. |
+| `web.apiProxyTarget` | release API service origin | Runtime target for local Next.js `/api` requests, including photo optimization. Do not include `/api`. |
 | `web.imagePullSecrets` | `[]` | Web-specific image pull secrets. |
 | `web.service.type` | `ClusterIP` | Web service type. |
 | `web.service.port` | `3000` | Web service port. |
-| `web.nextPublicApiUrl` | internal API service URL | Browser-facing API URL. |
+| `web.nextPublicApiUrl` | internal API service URL | Compatibility value for older web images; current images use same-origin `/api`. |
 | `web.podAnnotations`, `web.podLabels` | `{}` | Extra web pod metadata. |
 | `web.podSecurityContext` | `{}` | Web pod security context. |
 | `web.securityContext` | non-root | Web container security context. |
