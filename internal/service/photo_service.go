@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	storageapi "github.com/Brain4Fish/storagetron/internal/storage"
 	"github.com/Brain4Fish/storagetron/pkg/model"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 
 type PhotoRepository interface {
 	Create(context.Context, model.Photo) error
+	GetByID(context.Context, uuid.UUID) (model.Photo, error)
 	ListByItemID(context.Context, uuid.UUID) ([]model.Photo, error)
 	ListByContainerID(context.Context, uuid.UUID) ([]model.Photo, error)
 	ItemExists(context.Context, uuid.UUID) error
@@ -22,18 +24,19 @@ type PhotoRepository interface {
 	GetLabelByItemID(context.Context, uuid.UUID) (*model.ScanLabel, error)
 }
 
-type PresignStorage interface {
+type PhotoStorage interface {
 	PresignPut(context.Context, string, string) (string, error)
 	PresignGet(ctx context.Context, key string) (string, error)
+	OpenObject(context.Context, string) (storageapi.ObjectContent, error)
 	Delete(context.Context, string) error
 }
 
 type PhotoService struct {
 	repo    PhotoRepository
-	storage PresignStorage
+	storage PhotoStorage
 }
 
-func NewPhotoService(repo PhotoRepository, storage PresignStorage) *PhotoService {
+func NewPhotoService(repo PhotoRepository, storage PhotoStorage) *PhotoService {
 	return &PhotoService{repo: repo, storage: storage}
 }
 
@@ -109,6 +112,7 @@ func (s *PhotoService) ListByItemID(ctx context.Context, itemID uuid.UUID) ([]mo
 			return nil, err
 		}
 		photos[i].URL = url
+		photos[i].ContentURL = photoContentURL(photos[i].ID)
 	}
 
 	return photos, nil
@@ -126,9 +130,26 @@ func (s *PhotoService) ListByContainerID(ctx context.Context, containerID uuid.U
 			return nil, err
 		}
 		photos[i].URL = url
+		photos[i].ContentURL = photoContentURL(photos[i].ID)
 	}
 
 	return photos, nil
+}
+
+func (s *PhotoService) GetContent(ctx context.Context, photoID uuid.UUID) (storageapi.ObjectContent, error) {
+	photo, err := s.repo.GetByID(ctx, photoID)
+	if err != nil {
+		return storageapi.ObjectContent{}, err
+	}
+
+	object, err := s.storage.OpenObject(ctx, photo.ObjectKey)
+	if err != nil {
+		return storageapi.ObjectContent{}, err
+	}
+	if object.ContentType == "" {
+		object.ContentType = photo.ContentType
+	}
+	return object, nil
 }
 
 func (s *PhotoService) ListObjectKeysByItemID(ctx context.Context, itemID uuid.UUID) ([]string, error) {
@@ -198,4 +219,8 @@ func buildContainerPhotoObjectKey(containerID, photoID uuid.UUID, fileName strin
 		ext = ".bin"
 	}
 	return fmt.Sprintf("containers/%s/photos/%s%s", containerID.String(), photoID.String(), ext)
+}
+
+func photoContentURL(photoID uuid.UUID) string {
+	return "/api/photos/" + photoID.String() + "/content"
 }

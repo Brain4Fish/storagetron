@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Filter, Loader2, Minus, Package, Search, SlidersHorizontal } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, Container, InventoryLabel, Item } from "@/lib/api";
+import { api, Container, InventoryLabel, Item, photoContentUrl } from "@/lib/api";
 import {
     buildContainerItemPickerRows,
     filterAndSortContainerItemRows,
@@ -303,11 +303,10 @@ export function AddItemsToContainerDialog({
                                         <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-zinc-100 sm:h-24 sm:w-full">
                                             {row.item.photos?.[0]?.url ? (
                                                 <Image
-                                                    src={row.item.photos[0].url}
+                                                    src={photoContentUrl(row.item.photos[0])}
                                                     alt=""
                                                     fill
                                                     sizes="(min-width: 1024px) 180px, (min-width: 640px) 30vw, 96px"
-                                                    unoptimized
                                                     className="object-contain p-1.5 transition duration-200 group-hover:scale-[1.02]"
                                                 />
                                             ) : (

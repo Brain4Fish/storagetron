@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Brain4Fish/storagetron/internal/service"
+	storageapi "github.com/Brain4Fish/storagetron/internal/storage"
 	"github.com/Brain4Fish/storagetron/pkg/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -225,6 +226,10 @@ func (r *scanPhotoRepo) Create(context.Context, model.Photo) error {
 	return nil
 }
 
+func (r *scanPhotoRepo) GetByID(context.Context, uuid.UUID) (model.Photo, error) {
+	return model.Photo{}, pgx.ErrNoRows
+}
+
 func (r *scanPhotoRepo) ListByItemID(context.Context, uuid.UUID) ([]model.Photo, error) {
 	return nil, nil
 }
@@ -261,6 +266,10 @@ func (s *scanStorage) PresignPut(context.Context, string, string) (string, error
 
 func (s *scanStorage) PresignGet(context.Context, string) (string, error) {
 	return "", nil
+}
+
+func (s *scanStorage) OpenObject(context.Context, string) (storageapi.ObjectContent, error) {
+	return storageapi.ObjectContent{}, nil
 }
 
 func (s *scanStorage) Delete(context.Context, string) error {

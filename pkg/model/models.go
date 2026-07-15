@@ -71,6 +71,7 @@ type Photo struct {
 	ContentType string     `json:"content_type,omitempty"`
 	CreatedAt   time.Time  `json:"created_at,omitempty"`
 	URL         string     `json:"url"`
+	ContentURL  string     `json:"content_url"`
 }
 
 type ScanLabel struct {

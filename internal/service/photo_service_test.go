@@ -3,9 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
+	"time"
 
+	storageapi "github.com/Brain4Fish/storagetron/internal/storage"
 	"github.com/Brain4Fish/storagetron/pkg/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -76,6 +79,36 @@ func TestPhotoServiceListByItemIDAddsPresignedURLs(t *testing.T) {
 	require.Equal(t, itemID, repo.listItemID)
 	require.Equal(t, "https://storage/one", photos[0].URL)
 	require.Equal(t, "https://storage/two", photos[1].URL)
+	require.Equal(t, "/api/photos/"+photos[0].ID.String()+"/content", photos[0].ContentURL)
+	require.Equal(t, "/api/photos/"+photos[1].ID.String()+"/content", photos[1].ContentURL)
+}
+
+func TestPhotoServiceGetContentOpensStoredObjectAndFallsBackToDatabaseContentType(t *testing.T) {
+	photoID := uuid.New()
+	lastModified := time.Date(2026, 7, 15, 8, 0, 0, 0, time.UTC)
+	repo := &fakePhotoRepository{photoByID: model.Photo{
+		ID:          photoID,
+		ObjectKey:   "items/photo.jpg",
+		ContentType: "image/jpeg",
+	}}
+	storage := &fakePresignStorage{openObject: storageapi.ObjectContent{
+		Body:          io.NopCloser(strings.NewReader("photo")),
+		ContentLength: 5,
+		ETag:          `"etag"`,
+		LastModified:  lastModified,
+	}}
+	svc := NewPhotoService(repo, storage)
+
+	object, err := svc.GetContent(context.Background(), photoID)
+
+	require.NoError(t, err)
+	require.Equal(t, photoID, repo.getPhotoID)
+	require.Equal(t, "items/photo.jpg", storage.openKey)
+	require.Equal(t, "image/jpeg", object.ContentType)
+	require.Equal(t, int64(5), object.ContentLength)
+	require.Equal(t, `"etag"`, object.ETag)
+	require.Equal(t, lastModified, object.LastModified)
+	require.NoError(t, object.Body.Close())
 }
 
 func TestPhotoServiceDeleteItemPhotoDeletesObjectReturnedByRepository(t *testing.T) {
@@ -117,6 +150,9 @@ type fakePhotoRepository struct {
 	listItemID      uuid.UUID
 	listContainerID uuid.UUID
 	listErr         error
+	photoByID       model.Photo
+	getPhotoID      uuid.UUID
+	getPhotoErr     error
 
 	deletedItemPhoto      model.Photo
 	deletedContainerPhoto model.Photo
@@ -131,6 +167,11 @@ func (r *fakePhotoRepository) Create(_ context.Context, photo model.Photo) error
 	r.createCalled = true
 	r.created = photo
 	return r.createErr
+}
+
+func (r *fakePhotoRepository) GetByID(_ context.Context, photoID uuid.UUID) (model.Photo, error) {
+	r.getPhotoID = photoID
+	return r.photoByID, r.getPhotoErr
 }
 
 func (r *fakePhotoRepository) ListByItemID(_ context.Context, id uuid.UUID) ([]model.Photo, error) {
@@ -173,8 +214,11 @@ type fakePresignStorage struct {
 	putContentType string
 	putErr         error
 
-	getURLs map[string]string
-	getErr  error
+	getURLs    map[string]string
+	getErr     error
+	openObject storageapi.ObjectContent
+	openKey    string
+	openErr    error
 
 	deletedKeys []string
 	deleteErr   error
@@ -191,6 +235,11 @@ func (s *fakePresignStorage) PresignGet(_ context.Context, key string) (string, 
 		return "", s.getErr
 	}
 	return s.getURLs[key], nil
+}
+
+func (s *fakePresignStorage) OpenObject(_ context.Context, key string) (storageapi.ObjectContent, error) {
+	s.openKey = key
+	return s.openObject, s.openErr
 }
 
 func (s *fakePresignStorage) Delete(_ context.Context, key string) error {

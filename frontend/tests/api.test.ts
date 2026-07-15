@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { ApiError, api } from "../lib/api";
+import { ApiError, api, photoContentUrl } from "../lib/api";
+
+test("photoContentUrl prefers stable content URLs and falls back to legacy signed URLs", () => {
+    assert.equal(photoContentUrl({ content_url: "/api/photos/photo-1/content", url: "https://storage/signed" }), "/api/photos/photo-1/content");
+    assert.equal(photoContentUrl({ url: "https://storage/legacy-signed" }), "https://storage/legacy-signed");
+});
 
 test("api.scanCode normalizes URLs and encodes extracted scan code", async () => {
     const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];

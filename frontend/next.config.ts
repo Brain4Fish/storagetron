@@ -4,6 +4,7 @@ const apiProxyTarget = process.env.API_PROXY_TARGET || "http://localhost:8086";
 
 const nextConfig: NextConfig = {
     images: {
+        minimumCacheTTL: 31536000,
         remotePatterns: [
             {
                 protocol: "http",

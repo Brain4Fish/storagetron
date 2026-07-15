@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Box, ChevronRight, MapPin, Trash2 } from "lucide-react";
-import { Container } from "@/lib/api";
+import { Container, photoContentUrl } from "@/lib/api";
 import { formatLocation } from "@/lib/location";
 import { formatDate } from "@/lib/utils";
 import { containerItemCount } from "@/lib/inventory-view";
@@ -59,9 +59,10 @@ export function ContainersTable({
                             <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-zinc-100 text-zinc-700">
                                 {container.photos?.[0]?.url ? (
                                     <ImagePreview
-                                        src={container.photos[0].url}
+                                        src={photoContentUrl(container.photos[0])}
                                         alt={container.name}
                                         className="rounded-2xl"
+                                        sizes="96px"
                                     />
                                 ) : (
                                     <Box className="h-8 w-8" />
@@ -155,9 +156,10 @@ export function ContainersTable({
                                         <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-zinc-100 text-zinc-700">
                                             {container.photos?.[0]?.url ? (
                                                 <ImagePreview
-                                                    src={container.photos[0].url}
+                                                    src={photoContentUrl(container.photos[0])}
                                                     alt={container.name}
                                                     className="rounded-xl"
+                                                    sizes="48px"
                                                 />
                                             ) : (
                                                 <Box className="h-5 w-5" />

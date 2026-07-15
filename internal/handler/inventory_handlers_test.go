@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/Brain4Fish/storagetron/internal/service"
+	storageapi "github.com/Brain4Fish/storagetron/internal/storage"
 	"github.com/Brain4Fish/storagetron/pkg/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -259,6 +264,88 @@ func TestPhotoHandlerUploadMapsMissingItemToNotFound(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "item not found")
 }
 
+func TestPhotoHandlerContentStreamsObjectMetadataAndBody(t *testing.T) {
+	photoID := uuid.New()
+	lastModified := time.Date(2026, 7, 15, 5, 30, 0, 0, time.UTC)
+	repo := &inventoryPhotoRepo{photo: model.Photo{ID: photoID, ObjectKey: "items/photo.jpg"}}
+	storage := &inventoryStorage{object: storageapi.ObjectContent{
+		Body:          io.NopCloser(strings.NewReader("image-data")),
+		ContentType:   "image/jpeg",
+		ContentLength: 10,
+		ETag:          `"photo-etag"`,
+		LastModified:  lastModified,
+	}}
+	handler := NewPhotoHandler(newInventoryPhotoService(repo, storage), zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	handler.Content(rec, inventoryRequestWithParams(
+		http.MethodGet,
+		"/photos/"+photoID.String()+"/content",
+		"",
+		map[string]string{"photo_id": photoID.String()},
+	))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "image-data", rec.Body.String())
+	require.Equal(t, "image/jpeg", rec.Header().Get("Content-Type"))
+	require.Equal(t, "10", rec.Header().Get("Content-Length"))
+	require.Equal(t, `"photo-etag"`, rec.Header().Get("ETag"))
+	require.Equal(t, lastModified.Format(http.TimeFormat), rec.Header().Get("Last-Modified"))
+	require.Equal(t, "public, max-age=31536000, immutable", rec.Header().Get("Cache-Control"))
+	require.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
+	require.Equal(t, photoID, repo.getPhotoID)
+	require.Equal(t, "items/photo.jpg", storage.openKey)
+}
+
+func TestPhotoHandlerContentReturnsNotModifiedForMatchingValidator(t *testing.T) {
+	photoID := uuid.New()
+	lastModified := time.Date(2026, 7, 15, 5, 30, 0, 0, time.UTC)
+	repo := &inventoryPhotoRepo{photo: model.Photo{ID: photoID, ObjectKey: "items/photo.jpg"}}
+	storage := &inventoryStorage{object: storageapi.ObjectContent{
+		Body:         io.NopCloser(strings.NewReader("image-data")),
+		ETag:         `"photo-etag"`,
+		LastModified: lastModified,
+	}}
+	handler := NewPhotoHandler(newInventoryPhotoService(repo, storage), zap.NewNop())
+
+	req := inventoryRequestWithParams(http.MethodGet, "/photos/"+photoID.String()+"/content", "", map[string]string{"photo_id": photoID.String()})
+	req.Header.Set("If-None-Match", `W/"photo-etag"`)
+	rec := httptest.NewRecorder()
+	handler.Content(rec, req)
+
+	require.Equal(t, http.StatusNotModified, rec.Code)
+	require.Empty(t, rec.Body.String())
+	require.Equal(t, `"photo-etag"`, rec.Header().Get("ETag"))
+
+	storage.object.Body = io.NopCloser(strings.NewReader("image-data"))
+	req = inventoryRequestWithParams(http.MethodGet, "/photos/"+photoID.String()+"/content", "", map[string]string{"photo_id": photoID.String()})
+	req.Header.Set("If-Modified-Since", lastModified.Format(http.TimeFormat))
+	rec = httptest.NewRecorder()
+	handler.Content(rec, req)
+	require.Equal(t, http.StatusNotModified, rec.Code)
+}
+
+func TestPhotoHandlerContentMapsInvalidMissingAndStorageFailures(t *testing.T) {
+	handler := NewPhotoHandler(newInventoryPhotoService(&inventoryPhotoRepo{}, &inventoryStorage{}), zap.NewNop())
+	rec := httptest.NewRecorder()
+	handler.Content(rec, inventoryRequestWithParams(http.MethodGet, "/photos/not-a-uuid/content", "", map[string]string{"photo_id": "not-a-uuid"}))
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+
+	photoID := uuid.New()
+	handler = NewPhotoHandler(newInventoryPhotoService(&inventoryPhotoRepo{getPhotoErr: pgx.ErrNoRows}, &inventoryStorage{}), zap.NewNop())
+	rec = httptest.NewRecorder()
+	handler.Content(rec, inventoryRequestWithParams(http.MethodGet, "/photos/"+photoID.String()+"/content", "", map[string]string{"photo_id": photoID.String()}))
+	require.Equal(t, http.StatusNotFound, rec.Code)
+
+	handler = NewPhotoHandler(newInventoryPhotoService(
+		&inventoryPhotoRepo{photo: model.Photo{ID: photoID, ObjectKey: "items/missing.jpg"}},
+		&inventoryStorage{openErr: errors.New("storage unavailable")},
+	), zap.NewNop())
+	rec = httptest.NewRecorder()
+	handler.Content(rec, inventoryRequestWithParams(http.MethodGet, "/photos/"+photoID.String()+"/content", "", map[string]string{"photo_id": photoID.String()}))
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
 func TestPhotoHandlerDeleteItemPhotoReturnsNoContent(t *testing.T) {
 	itemID := uuid.New()
 	photoID := uuid.New()
@@ -455,6 +542,9 @@ type inventoryPhotoRepo struct {
 	itemExistsErr      error
 	containerExistsErr error
 	createErr          error
+	photo              model.Photo
+	getPhotoID         uuid.UUID
+	getPhotoErr        error
 
 	deletedItemPhoto      model.Photo
 	deletedContainerPhoto model.Photo
@@ -467,6 +557,11 @@ type inventoryPhotoRepo struct {
 
 func (r *inventoryPhotoRepo) Create(context.Context, model.Photo) error {
 	return r.createErr
+}
+
+func (r *inventoryPhotoRepo) GetByID(_ context.Context, photoID uuid.UUID) (model.Photo, error) {
+	r.getPhotoID = photoID
+	return r.photo, r.getPhotoErr
 }
 
 func (r *inventoryPhotoRepo) ListByItemID(context.Context, uuid.UUID) ([]model.Photo, error) {
@@ -503,6 +598,9 @@ func (r *inventoryPhotoRepo) GetLabelByItemID(context.Context, uuid.UUID) (*mode
 
 type inventoryStorage struct {
 	deletedKeys []string
+	object      storageapi.ObjectContent
+	openKey     string
+	openErr     error
 }
 
 func (s *inventoryStorage) PresignPut(context.Context, string, string) (string, error) {
@@ -511,6 +609,11 @@ func (s *inventoryStorage) PresignPut(context.Context, string, string) (string, 
 
 func (s *inventoryStorage) PresignGet(context.Context, string) (string, error) {
 	return "", nil
+}
+
+func (s *inventoryStorage) OpenObject(_ context.Context, key string) (storageapi.ObjectContent, error) {
+	s.openKey = key
+	return s.object, s.openErr
 }
 
 func (s *inventoryStorage) Delete(_ context.Context, key string) error {

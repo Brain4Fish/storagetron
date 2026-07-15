@@ -13,7 +13,7 @@ import {
     Search,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { api, Container, Item } from "@/lib/api";
+import { api, Container, Item, photoContentUrl } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { effectiveItemLocation, formatLocation } from "@/lib/location";
 import { containerItemCount } from "@/lib/inventory-view";
@@ -177,13 +177,13 @@ function StatCard({
 
 function RecentItem({ item, containers }: { item: Item; containers: Container[] }) {
     const container = containers.find((candidate) => (candidate.items ?? []).some((candidateItem) => candidateItem.id === item.id));
-    const firstPhoto = item.photos?.[0]?.url;
+    const firstPhoto = item.photos?.[0] ? photoContentUrl(item.photos[0]) : undefined;
 
     return (
         <Link href={`/items/${item.id}`} className="flex items-center gap-3 py-3 transition hover:bg-zinc-50">
             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-100">
                 {firstPhoto ? (
-                    <Image src={firstPhoto} alt="" fill sizes="56px" unoptimized className="object-cover" />
+                    <Image src={firstPhoto} alt="" fill sizes="56px" className="object-cover" />
                 ) : (
                     <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                         <Package className="h-5 w-5" />

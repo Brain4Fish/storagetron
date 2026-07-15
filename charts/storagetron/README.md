@@ -77,7 +77,7 @@ The web app uses `web.nextPublicApiUrl` for browser-side API calls. Set it to th
 
 ## S3 And Photo Uploads
 
-Storagetron uploads photos through presigned S3 URLs. `api.s3.endpoint` must be reachable by the API pod, and `api.s3.publicEndpoint` must be reachable by the user's browser. When using bundled MinIO without ingress, browser uploads generally require port-forwarding or another route to MinIO.
+Storagetron uploads photos through presigned S3 URLs. `api.s3.endpoint` must be reachable by the API pod, and `api.s3.publicEndpoint` must be reachable by the user's browser for uploads. Displayed photos use stable same-origin `/api/photos/{photo_id}/content` URLs so the browser and Next.js image optimizer can cache them. When using bundled MinIO without ingress, browser uploads generally require port-forwarding or another route to MinIO.
 
 For the bundled MinIO setup job, `minio.setup.corsAllowedOrigins` controls the CORS origins configured on MinIO. The default `*` is demo-friendly; use specific origins for real deployments.
 

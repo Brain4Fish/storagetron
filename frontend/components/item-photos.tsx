@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Loader2, X } from "lucide-react";
+import { photoContentUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type Photo = {
     id: string;
     url: string;
+    content_url?: string;
 };
 
 export function ItemPhotos({
@@ -39,13 +41,13 @@ export function ItemPhotos({
                         <button
                             type="button"
                             aria-label="View photo"
-                            onClick={() => setSelected(p.url)}
+                            onClick={() => setSelected(photoContentUrl(p))}
                             className={cn(
                                 "relative block aspect-square w-full overflow-hidden rounded-lg transition hover:opacity-90",
                                 variant === "compact" && "h-20 w-20",
                             )}
                         >
-                            <Image src={p.url} alt="" fill sizes={variant === "compact" ? "80px" : "(min-width: 768px) 33vw, 50vw"} unoptimized className="object-cover" />
+                            <Image src={photoContentUrl(p)} alt="" fill sizes={variant === "compact" ? "80px" : "(min-width: 768px) 33vw, 50vw"} className="object-cover" />
                         </button>
                         {onDelete ? (
                             <button
@@ -73,7 +75,7 @@ export function ItemPhotos({
                     className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
                 >
                     <div className="relative h-[90%] w-[90%]">
-                        <Image src={selected} alt="Selected item photo" fill sizes="90vw" unoptimized className="rounded-lg object-contain" />
+                        <Image src={selected} alt="Selected item photo" fill sizes="90vw" className="rounded-lg object-contain" />
                     </div>
                 </div>
             )}

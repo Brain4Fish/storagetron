@@ -20,7 +20,12 @@ export type Photo = {
     content_type?: string;
     created_at?: string;
     url: string;
+    content_url?: string;
 };
+
+export function photoContentUrl(photo: Pick<Photo, "content_url" | "url">): string {
+    return photo.content_url || photo.url;
+}
 
 export type Item = {
     id: string;

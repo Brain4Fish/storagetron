@@ -111,7 +111,7 @@ The API requires these environment variables:
 | --- | --- |
 | `DATABASE_URL` | Postgres connection string. |
 | `S3_ENDPOINT` | Internal S3 endpoint used by the API. |
-| `S3_PUBLIC_ENDPOINT` | Browser-reachable S3 endpoint used in presigned URLs. |
+| `S3_PUBLIC_ENDPOINT` | Browser-reachable S3 endpoint used for presigned photo uploads. |
 | `S3_BUCKET` | Bucket for photo objects. |
 | `S3_ACCESS_KEY` | S3 access key. |
 | `S3_SECRET_KEY` | S3 secret key. |
@@ -126,6 +126,34 @@ API_PROXY_TARGET=http://localhost:8080 npm run dev
 ```
 
 Mobile camera scanning requires a secure context. It works on `localhost`, but phones opening the app through a LAN address usually need HTTPS before the browser will grant camera access.
+
+### Nginx reverse proxy performance
+
+When Nginx terminates TLS in front of Storagetron, enable HTTP/2 and compress text responses at that outermost proxy. The API and Next.js set their own cache headers, so preserve upstream `Cache-Control` instead of replacing it. JPEG and WebP payloads are already compressed and should not be added to `gzip_types`.
+
+```nginx
+server {
+  listen 443 ssl;
+  http2 on;
+
+  gzip on;
+  gzip_vary on;
+  gzip_proxied any;
+  gzip_min_length 1024;
+  gzip_comp_level 5;
+  gzip_types application/json application/javascript image/svg+xml text/css text/plain text/x-component;
+
+  location / {
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://10.40.0.12;
+  }
+}
+```
+
+If Traefik is only reachable through this Nginx server, do not add a second compression middleware to the ingress. Keep the existing `/api` and `/` ingress routing unchanged.
 
 ## API Examples
 
@@ -213,6 +241,20 @@ curl -X POST http://localhost:8086/items/{item_id}/photos \
 ```
 
 The response contains `upload_url`; upload the file to that URL with `PUT`.
+
+Photo objects returned by item and container APIs include both fields:
+
+- `url` is the legacy presigned S3 download URL retained for API compatibility.
+- `content_url` is the stable same-origin URL used by the web UI, such as `/api/photos/{photo_id}/content`.
+
+Fetch original photo content through either registered API prefix:
+
+```bash
+curl http://localhost:8086/photos/{photo_id}/content
+curl http://localhost:8086/api/photos/{photo_id}/content
+```
+
+Photo content URLs are immutable because photo IDs are never reused. Responses include a one-year cache policy plus `ETag` and `Last-Modified` validators.
 
 Scan a label or UUID:
 

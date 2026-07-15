@@ -95,7 +95,7 @@ api:
   s3:
     # -- Internal API-facing S3 endpoint. Required when minio.enabled=false.
     endpoint: ""
-    # -- Browser-reachable S3 endpoint used in presigned URLs. Required when minio.enabled=false.
+    # -- Browser-reachable S3 endpoint used for presigned uploads. Required when minio.enabled=false.
     publicEndpoint: ""
     bucket: inventory
     # -- Demo fallback only. Prefer secret.existingSecret for production.

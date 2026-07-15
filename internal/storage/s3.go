@@ -105,6 +105,14 @@ type ObjectInfo struct {
 	LastModified time.Time
 }
 
+type ObjectContent struct {
+	Body          io.ReadCloser
+	ContentType   string
+	ContentLength int64
+	ETag          string
+	LastModified  time.Time
+}
+
 func (s *S3) ListObjects(ctx context.Context) ([]ObjectInfo, error) {
 	paginator := s3.NewListObjectsV2Paginator(s.internalClient, &s3.ListObjectsV2Input{
 		Bucket: &s.bucket,
@@ -131,14 +139,34 @@ func (s *S3) ListObjects(ctx context.Context) ([]ObjectInfo, error) {
 }
 
 func (s *S3) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
+	object, err := s.OpenObject(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	return object.Body, nil
+}
+
+func (s *S3) OpenObject(ctx context.Context, key string) (ObjectContent, error) {
 	out, err := s.internalClient.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &s.bucket,
 		Key:    &key,
 	})
 	if err != nil {
-		return nil, err
+		return ObjectContent{}, err
 	}
-	return out.Body, nil
+
+	contentLength := int64(-1)
+	if out.ContentLength != nil {
+		contentLength = *out.ContentLength
+	}
+
+	return ObjectContent{
+		Body:          out.Body,
+		ContentType:   aws.ToString(out.ContentType),
+		ContentLength: contentLength,
+		ETag:          aws.ToString(out.ETag),
+		LastModified:  aws.ToTime(out.LastModified),
+	}, nil
 }
 
 func (s *S3) PutObject(ctx context.Context, key string, body io.Reader, size int64, contentType string) error {
