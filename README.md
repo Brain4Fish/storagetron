@@ -125,6 +125,8 @@ cd frontend
 API_PROXY_TARGET=http://localhost:8080 npm run dev
 ```
 
+The same target is read by the web server at runtime when Next.js optimizes stable photo URLs. The Helm chart automatically points it at the API service for the current release.
+
 Mobile camera scanning requires a secure context. It works on `localhost`, but phones opening the app through a LAN address usually need HTTPS before the browser will grant camera access.
 
 ### Nginx reverse proxy performance

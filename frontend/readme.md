@@ -23,6 +23,11 @@ default it proxies to `http://localhost:8086`, matching the root
 API_PROXY_TARGET=http://localhost:8080 npm run dev
 ```
 
+The photo optimizer also uses `API_PROXY_TARGET` at runtime through the local
+`/api/photos/:photo_id/content` route. Kubernetes deployments must set it to an
+API address reachable from the web pod; the Storagetron Helm chart does this
+automatically with the release-specific API service name.
+
 When running the web UI from Docker Compose, the image must be rebuilt after
 changing `API_PROXY_TARGET` because Next.js includes rewrites during the build:
 

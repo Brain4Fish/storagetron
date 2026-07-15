@@ -2,7 +2,7 @@ apiVersion: v2
 name: storagetron
 description: Self-hosted home inventory with a Go API, Next.js UI, Postgres, and S3-compatible object storage
 type: application
-version: 0.3.0
+version: 0.3.1
 appVersion: "0.2.0"
 home: https://github.com/Brain4Fish/storagetron
 keywords:
@@ -20,6 +20,7 @@ annotations:
   artifacthub.io/category: storage
   artifacthub.io/license: MIT
   artifacthub.io/changes: |
+    - Add a release-aware runtime API target for Next.js photo optimization.
     - Harden Helm values and templates for public chart use.
     - Add existingSecret support and production-oriented documentation.
     - Add probes, security contexts, optional HPA/PDB, and schema validation.

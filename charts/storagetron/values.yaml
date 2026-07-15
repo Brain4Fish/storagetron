@@ -163,6 +163,8 @@ web:
     maxUnavailable: null
   # -- Browser-facing API URL. Set to your ingress/API URL for real deployments.
   nextPublicApiUrl: ""
+  # -- Runtime API target used by the web server for image optimization. Defaults to the chart's API service.
+  apiProxyTarget: ""
 
 # Bundled Postgres is convenient for demos and small trusted clusters. Production
 # users should generally provide managed or separately operated Postgres instead.

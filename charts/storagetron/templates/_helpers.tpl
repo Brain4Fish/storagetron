@@ -104,6 +104,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 {{- end -}}
 
+{{- define "storagetron.webApiProxyTarget" -}}
+{{- if .Values.web.apiProxyTarget -}}
+{{- .Values.web.apiProxyTarget -}}
+{{- else -}}
+{{- printf "http://%s:%v" (include "storagetron.apiName" .) .Values.api.service.port -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "storagetron.ingressServiceName" -}}
 {{- $root := .root -}}
 {{- $path := .path -}}
