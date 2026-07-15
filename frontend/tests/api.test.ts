@@ -5,6 +5,7 @@ import { ApiError, api, photoContentUrl } from "../lib/api";
 
 test("photoContentUrl prefers stable content URLs and falls back to legacy signed URLs", () => {
     assert.equal(photoContentUrl({ content_url: "/api/photos/photo-1/content", url: "https://storage/signed" }), "/api/photos/photo-1/content");
+    assert.equal(photoContentUrl({ content_url: "https://api.test/photos/photo-1/content", url: "https://storage/signed" }), "https://api.test/photos/photo-1/content");
     assert.equal(photoContentUrl({ url: "https://storage/legacy-signed" }), "https://storage/legacy-signed");
 });
 

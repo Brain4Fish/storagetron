@@ -67,7 +67,6 @@ services:
       args:
         WEB_VERSION: ${WEB_VERSION:-dev}
         WEB_COMMIT: ${WEB_COMMIT:-unknown}
-        API_PROXY_TARGET: http://app:8080
     depends_on:
       app:
         condition: service_started
