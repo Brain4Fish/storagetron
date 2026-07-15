@@ -27,6 +27,26 @@ func (r *PhotoRepo) Create(ctx context.Context, photo model.Photo) error {
 	return err
 }
 
+func (r *PhotoRepo) GetByID(ctx context.Context, photoID uuid.UUID) (model.Photo, error) {
+	var photo model.Photo
+	err := r.db.QueryRow(ctx, `
+		SELECT id, item_id, container_id, object_key, COALESCE(content_type, ''), created_at
+		FROM photos
+		WHERE id = $1
+	`, photoID).Scan(
+		&photo.ID,
+		&photo.ItemID,
+		&photo.ContainerID,
+		&photo.ObjectKey,
+		&photo.ContentType,
+		&photo.CreatedAt,
+	)
+	if err != nil {
+		return model.Photo{}, err
+	}
+	return photo, nil
+}
+
 func (r *PhotoRepo) ListByItemID(ctx context.Context, itemID uuid.UUID) ([]model.Photo, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, item_id, container_id, object_key, COALESCE(content_type, ''), created_at

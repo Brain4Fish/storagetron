@@ -94,6 +94,11 @@ func TestRepositoryIntegrationPhotoCreateListAndDelete(t *testing.T) {
 	require.Equal(t, "items/camera.jpg", photos[0].ObjectKey)
 	require.Equal(t, "image/jpeg", photos[0].ContentType)
 
+	photo, err := photoRepo.GetByID(ctx, photoID)
+	require.NoError(t, err)
+	require.Equal(t, photoID, photo.ID)
+	require.Equal(t, "items/camera.jpg", photo.ObjectKey)
+
 	deleted, err := photoRepo.DeleteByItemID(ctx, itemID, photoID)
 	require.NoError(t, err)
 	require.Equal(t, photoID, deleted.ID)

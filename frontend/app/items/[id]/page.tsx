@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, photoContentUrl } from "@/lib/api";
 import { buildItemRows } from "@/lib/inventory-view";
 import { downloadSelectedAssetsXlsx } from "@/lib/export-assets";
 import { PageShell } from "@/components/page-shell";
@@ -118,7 +118,7 @@ export default function ItemDetailsPage() {
     if (isLoading) return <PageShell><div className="pt-16 text-sm text-muted-foreground md:pt-0">Loading item...</div></PageShell>;
     if (!data || !row) return <PageShell><div className="pt-16 text-sm text-muted-foreground md:pt-0">Not found</div></PageShell>;
 
-    const firstPhoto = data.photos?.[0]?.url;
+    const firstPhoto = data.photos?.[0] ? photoContentUrl(data.photos[0]) : undefined;
     const itemUrl = `${window.location.origin}/scan/${data.id}`;
     const downloadXlsx = async () => {
         setIsExporting(true);
@@ -165,7 +165,7 @@ export default function ItemDetailsPage() {
                             <div className="overflow-hidden rounded-2xl border border-border bg-zinc-100">
                                 <div className="relative aspect-[4/3]">
                                     {firstPhoto ? (
-                                        <Image src={firstPhoto} alt={`${data.name} photo`} fill sizes="(min-width: 1024px) 40vw, 100vw" unoptimized className="object-cover" />
+                                        <Image src={firstPhoto} alt={`${data.name} photo`} fill sizes="(min-width: 1024px) 40vw, 100vw" className="object-cover" />
                                     ) : (
                                         <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                                             <Package className="h-16 w-16" />

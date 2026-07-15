@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Box, Building2, MoreHorizontal, Package, Trash2 } from "lucide-react";
-import { Item } from "@/lib/api";
+import { Item, photoContentUrl } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { ItemRowView, itemStatusLabel } from "@/lib/inventory-view";
 import { Button } from "@/components/ui/button";
@@ -40,9 +40,10 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                             <div className="h-[7.25rem] w-[7.25rem] shrink-0 overflow-hidden rounded-2xl bg-zinc-100">
                                 {row.item.photos?.[0]?.url ? (
                                     <ImagePreview
-                                        src={row.item.photos[0].url}
+                                        src={photoContentUrl(row.item.photos[0])}
                                         alt={row.item.name}
                                         className="rounded-2xl"
+                                        sizes="116px"
                                     />
                                 ) : (
                                     <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -141,9 +142,10 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                             <div className="h-12 w-12 overflow-hidden rounded-xl bg-zinc-100">
                                                 {row.item.photos?.[0]?.url ? (
                                                     <ImagePreview
-                                                        src={row.item.photos[0].url}
+                                                        src={photoContentUrl(row.item.photos[0])}
                                                         alt={row.item.name}
                                                         className="rounded-xl"
+                                                        sizes="48px"
                                                     />
                                                 ) : (
                                                     <div className="flex h-full w-full items-center justify-center text-muted-foreground">

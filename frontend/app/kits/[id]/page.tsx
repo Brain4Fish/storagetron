@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Box, Download, Edit3, MapPin, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, photoContentUrl } from "@/lib/api";
 import { downloadInventoryRowsXlsx, downloadSelectedAssetsXlsx, mergeExportLabels } from "@/lib/export-assets";
 import { formatLocation } from "@/lib/location";
 import { PageShell } from "@/components/page-shell";
@@ -284,7 +284,7 @@ export default function KitDetailsPage() {
     }
 
     const kitUrl = `${window.location.origin}/scan/${container.id}`;
-    const firstPhoto = container.photos?.[0]?.url;
+    const firstPhoto = container.photos?.[0] ? photoContentUrl(container.photos[0]) : undefined;
 
     return (
         <PageShell>
@@ -317,7 +317,7 @@ export default function KitDetailsPage() {
                                 <div className="overflow-hidden rounded-2xl border border-border bg-zinc-100">
                                     <div className="relative aspect-[4/3]">
                                         {firstPhoto ? (
-                                            <Image src={firstPhoto} alt={`${container.name} photo`} fill sizes="(min-width: 1024px) 40vw, 100vw" unoptimized className="object-cover" />
+                                            <Image src={firstPhoto} alt={`${container.name} photo`} fill sizes="(min-width: 1024px) 40vw, 100vw" className="object-cover" />
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                                                 <Box className="h-16 w-16" />

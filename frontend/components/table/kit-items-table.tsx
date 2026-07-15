@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Loader2, Package, X } from "lucide-react";
-import { Item } from "@/lib/api";
+import { Item, photoContentUrl } from "@/lib/api";
 import { effectiveItemLocation, formatLocation, isInheritedItemLocation } from "@/lib/location";
 import { formatDate } from "@/lib/utils";
 import { ImagePreview } from "@/components/image-preview";
@@ -67,9 +67,10 @@ export function KitItemsTable({
                         <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100 text-muted-foreground">
                             {item.photos?.[0]?.url ? (
                                 <ImagePreview
-                                    src={item.photos[0].url}
+                                    src={photoContentUrl(item.photos[0])}
                                     alt={item.name}
                                     className="rounded-xl"
+                                    sizes="80px"
                                 />
                             ) : (
                                 <Package className="h-7 w-7" />
@@ -158,9 +159,10 @@ export function KitItemsTable({
                                     <div className="h-12 w-12 overflow-hidden rounded-lg bg-gray-200">
                                         {item.photos?.[0]?.url ? (
                                             <ImagePreview
-                                                src={item.photos[0].url}
+                                                src={photoContentUrl(item.photos[0])}
                                                 alt={item.name}
                                                 className="rounded-lg"
+                                                sizes="48px"
                                             />
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-gray-400">

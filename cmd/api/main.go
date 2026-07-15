@@ -157,6 +157,7 @@ func main() {
 		r.Post("/labels", labelHandler.Create)
 		r.Patch("/labels/{id}", labelHandler.Update)
 		r.Delete("/labels/{id}", labelHandler.Delete)
+		r.Get("/photos/{photo_id}/content", photoHandler.Content)
 
 		r.Get("/scan/{code}", scanHandler.Scan)
 		r.Route("/backup", backupHandler.Routes)

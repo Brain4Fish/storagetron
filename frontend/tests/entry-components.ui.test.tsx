@@ -51,3 +51,25 @@ test("desktop item metadata columns stay on one line", () => {
     expect(cells.find((cell) => cell.textContent?.includes("Jul 12, 2026"))).toHaveClass("whitespace-nowrap");
     expect(table?.querySelector(".status-pill")).toHaveClass("whitespace-nowrap");
 });
+
+test("item thumbnails use stable optimized photo URLs at responsive display sizes", () => {
+    const item = {
+        id: "item-photo",
+        name: "Camera",
+        created_at: "2026-07-12T00:00:00Z",
+        labels: [],
+        photos: [{
+            id: "photo-1",
+            url: "https://storage.test/legacy-signed-photo",
+            content_url: "/api/photos/photo-1/content",
+        }],
+    };
+    const view = render(<ItemsTable rows={[{ item, locationLabel: "No location", containerLabel: "No container", status: "loose", searchText: "camera" }]} selectedItemIds={new Set()} onToggleItem={vi.fn()} onToggleItems={vi.fn()} />);
+
+    const images = Array.from(view.container.querySelectorAll("img"));
+    expect(images).toHaveLength(2);
+    expect(images.every((image) => image.getAttribute("src")?.startsWith("/_next/image?"))).toBe(true);
+    expect(images.every((image) => image.getAttribute("src")?.includes(encodeURIComponent("/api/photos/photo-1/content")))).toBe(true);
+    expect(images.some((image) => image.getAttribute("sizes") === "116px")).toBe(true);
+    expect(images.some((image) => image.getAttribute("sizes") === "48px")).toBe(true);
+});

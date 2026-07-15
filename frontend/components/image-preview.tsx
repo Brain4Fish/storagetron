@@ -11,9 +11,16 @@ type ImagePreviewProps = {
     alt?: string;
     className?: string;
     imageClassName?: string;
+    sizes?: string;
 };
 
-export function ImagePreview({ src, alt = "", className, imageClassName }: ImagePreviewProps) {
+export function ImagePreview({
+    src,
+    alt = "",
+    className,
+    imageClassName,
+    sizes = "(min-width: 768px) 48px, 116px",
+}: ImagePreviewProps) {
     const [open, setOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -51,8 +58,7 @@ export function ImagePreview({ src, alt = "", className, imageClassName }: Image
                     src={src}
                     alt={alt}
                     fill
-                    sizes="(min-width: 768px) 20vw, 50vw"
-                    unoptimized
+                    sizes={sizes}
                     className={cn("object-cover transition-transform hover:scale-105", imageClassName)}
                 />
             </button>
@@ -81,7 +87,6 @@ export function ImagePreview({ src, alt = "", className, imageClassName }: Image
                             alt={alt}
                             fill
                             sizes="100vw"
-                            unoptimized
                             className="object-contain"
                         />
                     </div>
