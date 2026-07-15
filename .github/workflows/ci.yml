@@ -191,8 +191,8 @@ jobs:
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=storagetron-api-v1
-          cache-to: type=gha,scope=storagetron-api-v1,mode=max,ignore-error=true
+#          cache-from: type=gha,scope=storagetron-api-v1
+#          cache-to: type=gha,scope=storagetron-api-v1,mode=max,ignore-error=true
           build-args: |
             APP_VERSION=${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
             APP_COMMIT=${{ github.sha }}
@@ -277,8 +277,8 @@ jobs:
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=storagetron-web-v1
-          cache-to: type=gha,scope=storagetron-web-v1,mode=max,ignore-error=true
+#          cache-from: type=gha,scope=storagetron-web-v1
+#          cache-to: type=gha,scope=storagetron-web-v1,mode=max,ignore-error=true
           build-args: |
             WEB_VERSION=${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
             WEB_COMMIT=${{ github.sha }}
@@ -438,6 +438,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.cache-scope }}
-          cache-to: type=gha,scope=${{ matrix.cache-scope }},mode=max,ignore-error=true
+#          cache-from: type=gha,scope=${{ matrix.cache-scope }}
+#          cache-to: type=gha,scope=${{ matrix.cache-scope }},mode=max,ignore-error=true
           build-args: ${{ matrix.build-args }}
