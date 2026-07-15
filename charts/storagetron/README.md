@@ -73,7 +73,7 @@ ingress:
           service: api
 ```
 
-The web app uses `web.nextPublicApiUrl` for browser-side API calls. Set it to the API URL users can reach through ingress or a load balancer.
+The web app uses `web.nextPublicApiUrl` for browser-side API calls. Set it to the API URL users can reach through ingress or a load balancer. The web server uses `web.apiProxyTarget` for runtime image optimization; leave it empty to target the API service from the same Helm release.
 
 ## S3 And Photo Uploads
 
@@ -144,6 +144,7 @@ All key names can be changed under `secret.keys`.
 | `web.image.repository` | `storagetron-web` | Web image repository. |
 | `web.image.tag` | `latest` | Web image tag. Prefer immutable tags in production. |
 | `web.image.pullPolicy` | `IfNotPresent` | Web image pull policy. |
+| `web.apiProxyTarget` | release API service URL | Runtime API target used by the Next.js photo optimizer. |
 | `web.imagePullSecrets` | `[]` | Web-specific image pull secrets. |
 | `web.service.type` | `ClusterIP` | Web service type. |
 | `web.service.port` | `3000` | Web service port. |

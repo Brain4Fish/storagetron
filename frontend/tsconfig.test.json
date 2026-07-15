@@ -16,6 +16,7 @@
     "lib/export-assets.ts",
     "lib/item-entry.ts",
     "lib/location.ts",
+    "lib/photo-proxy.ts",
     "lib/scan.ts",
     "lib/utils.ts",
     "tests/**/*.test.ts"

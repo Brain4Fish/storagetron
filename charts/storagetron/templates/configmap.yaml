@@ -9,3 +9,4 @@ data:
   S3_PUBLIC_ENDPOINT: {{ include "storagetron.s3PublicEndpoint" . | quote }}
   S3_BUCKET: {{ include "storagetron.s3Bucket" . | quote }}
   NEXT_PUBLIC_API_URL: {{ include "storagetron.webApiUrl" . | quote }}
+  API_PROXY_TARGET: {{ include "storagetron.webApiProxyTarget" . | quote }}
