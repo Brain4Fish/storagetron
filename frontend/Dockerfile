@@ -35,7 +35,7 @@ ENV API_PROXY_TARGET=http://localhost:8086
 
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
-COPY --from=builder /app/.next ./.next
+COPY --chown=65532:65532 --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 
 EXPOSE 3000
