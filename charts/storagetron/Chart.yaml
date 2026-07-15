@@ -21,6 +21,7 @@ annotations:
   artifacthub.io/license: MIT
   artifacthub.io/changes: |
     - Add a release-aware runtime API target for Next.js photo optimization.
+    - Support the writable Next.js image cache used by non-root web pods.
     - Harden Helm values and templates for public chart use.
     - Add existingSecret support and production-oriented documentation.
     - Add probes, security contexts, optional HPA/PDB, and schema validation.
