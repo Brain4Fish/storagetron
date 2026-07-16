@@ -47,15 +47,6 @@ export function ContainersTable({
                 {containers.map((container) => (
                     <article key={container.id} className="apple-card rounded-2xl p-3">
                         <div className="flex gap-3">
-                            {canSelect ? (
-                                <input
-                                    type="checkbox"
-                                    aria-label={`Select ${container.name}`}
-                                    checked={selectedContainerIds?.has(container.id) ?? false}
-                                    onChange={() => onToggleContainer?.(container.id)}
-                                    className="mt-2 h-4 w-4 shrink-0 rounded border-gray-300 accent-primary"
-                                />
-                            ) : null}
                             <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-zinc-100 text-zinc-700">
                                 {container.photos?.[0]?.url ? (
                                     <ImagePreview
@@ -102,8 +93,20 @@ export function ContainersTable({
                                         <span className="truncate">{formatLocation(container.location) || "No location"}</span>
                                     </div>
                                 </div>
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                    Added {formatDate(container.created_at)}
+                                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                    <span>Added {formatDate(container.created_at)}</span>
+                                    {canSelect ? (
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                aria-label={`Select ${container.name}`}
+                                                checked={selectedContainerIds?.has(container.id) ?? false}
+                                                onChange={() => onToggleContainer?.(container.id)}
+                                                className="h-4 w-4 rounded border-gray-300 accent-primary"
+                                            />
+                                            Select
+                                        </label>
+                                    ) : null}
                                 </div>
                             </div>
                         </div>

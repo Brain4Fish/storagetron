@@ -44,6 +44,8 @@ export default function KitsPage() {
         ].filter(Boolean).join(" ").toLowerCase().includes(normalized));
     }, [containers, query]);
     const selectedCount = selectedContainerIds.size;
+    const allFilteredContainersSelected = filteredContainers.length > 0
+        && filteredContainers.every((container) => selectedContainerIds.has(container.id));
 
     const selectedContainers = useMemo(
         () => containers.filter((container) => selectedContainerIds.has(container.id)),
@@ -72,6 +74,14 @@ export default function KitsPage() {
                     next.delete(containerId);
                 }
             });
+            return next;
+        });
+    };
+
+    const selectAllFilteredContainers = () => {
+        setSelectedContainerIds((current) => {
+            const next = new Set(current);
+            filteredContainers.forEach((container) => next.add(container.id));
             return next;
         });
     };
@@ -191,6 +201,16 @@ export default function KitsPage() {
                             ) : null}
                         </div>
                         <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={selectAllFilteredContainers}
+                                disabled={filteredContainers.length === 0 || allFilteredContainersSelected}
+                            >
+                                Select all
+                            </Button>
+                            <Button variant="outline" onClick={clearSelection}>
+                                Clear selection
+                            </Button>
                             <Button onClick={downloadSelectedXlsx} disabled={isExporting}>
                                 <Download className="h-4 w-4" />
                                 {isExporting ? "Preparing..." : "Download XLSX"}
@@ -198,9 +218,6 @@ export default function KitsPage() {
                             <Button variant="destructive" onClick={openDeleteSelected} disabled={isDeleting}>
                                 <Trash2 className="h-4 w-4" />
                                 Delete
-                            </Button>
-                            <Button variant="outline" onClick={clearSelection}>
-                                Clear selection
                             </Button>
                         </div>
                         {exportError || actionError ? (

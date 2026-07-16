@@ -5,6 +5,7 @@ import { expect, test, vi } from "vitest";
 import { SearchableLabelPicker } from "@/components/labels/searchable-label-picker";
 import { PrintLabelDialog } from "@/components/print-label-dialog";
 import { ItemsTable } from "@/components/table/items-table";
+import { ContainersTable } from "@/components/table/containers-table";
 
 test("searchable labels filter, select, remove, and create inline", async () => {
     const onChange = vi.fn();
@@ -72,4 +73,28 @@ test("item thumbnails use stable optimized photo URLs at responsive display size
     expect(images.every((image) => image.getAttribute("src")?.includes(encodeURIComponent("/api/photos/photo-1/content")))).toBe(true);
     expect(images.some((image) => image.getAttribute("sizes") === "116px")).toBe(true);
     expect(images.some((image) => image.getAttribute("sizes") === "48px")).toBe(true);
+});
+
+test("mobile container cards place selection in the metadata footer", () => {
+    const view = render(
+        <ContainersTable
+            containers={[{
+                id: "container-1",
+                name: "Camera box",
+                created_at: "2026-07-16T00:00:00Z",
+                labels: [],
+                inherited_labels: [],
+            }]}
+            selectedContainerIds={new Set()}
+            onToggleContainer={vi.fn()}
+            onToggleContainers={vi.fn()}
+        />,
+    );
+
+    const mobileCard = view.container.querySelector(".md\\:hidden article");
+    const checkbox = mobileCard?.querySelector('input[aria-label="Select Camera box"]');
+    expect(checkbox?.parentElement).toHaveTextContent("Select");
+    expect(checkbox?.parentElement?.tagName).toBe("LABEL");
+    expect(checkbox?.parentElement?.parentElement).toHaveClass("justify-between");
+    expect(mobileCard?.querySelector(":scope > div > input")).toBeNull();
 });
