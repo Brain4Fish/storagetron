@@ -71,6 +71,8 @@ export default function ItemsPage() {
     const canGoPrevious = page > 0;
     const canGoNext = page + 1 < totalPages;
     const selectedCount = selectedItemIds.size;
+    const allFilteredItemsSelected = filteredRows.length > 0
+        && filteredRows.every((row) => selectedItemIds.has(row.item.id));
     const activeFilterCount = [
         query.trim() !== "",
         locationFilter !== "all",
@@ -115,6 +117,14 @@ export default function ItemsPage() {
                     next.delete(itemId);
                 }
             });
+            return next;
+        });
+    };
+
+    const selectAllFilteredItems = () => {
+        setSelectedItemIds((current) => {
+            const next = new Set(current);
+            filteredRows.forEach((row) => next.add(row.item.id));
             return next;
         });
     };
@@ -299,6 +309,16 @@ export default function ItemsPage() {
                             ) : null}
                         </div>
                         <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={selectAllFilteredItems}
+                                disabled={filteredRows.length === 0 || allFilteredItemsSelected}
+                            >
+                                Select all
+                            </Button>
+                            <Button variant="outline" onClick={clearSelection}>
+                                Clear selection
+                            </Button>
                             <Button onClick={downloadSelectedXlsx} disabled={isExporting}>
                                 <Download className="h-4 w-4" />
                                 {isExporting ? "Preparing..." : "Download XLSX"}
@@ -306,9 +326,6 @@ export default function ItemsPage() {
                             <Button variant="destructive" onClick={openDeleteSelected} disabled={isDeleting}>
                                 <Trash2 className="h-4 w-4" />
                                 Delete
-                            </Button>
-                            <Button variant="outline" onClick={clearSelection}>
-                                Clear selection
                             </Button>
                         </div>
                         {exportError || actionError ? (
