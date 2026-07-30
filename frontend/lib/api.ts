@@ -31,6 +31,14 @@ export type Item = {
     id: string;
     name: string;
     description?: string;
+    quantity: number;
+    category: string;
+    acquisition_year: number | null;
+    condition: "new" | "used";
+    serial_number: string;
+    estimated_value: number | null;
+    value_currency: string | null;
+    source_language: string;
     location_id?: string;
     location?: Location;
     inherited_location?: Location;
@@ -50,6 +58,12 @@ export type Container = {
     id: string;
     name: string;
     description?: string;
+    package_code: string;
+    gross_weight_kg: number | null;
+    volume_m3: number | null;
+    estimated_value: number | null;
+    value_currency: string | null;
+    source_language: string;
     location_id?: string;
     location?: Location;
     created_at: string;
@@ -85,6 +99,28 @@ type InventoryRecordRequest = {
     description?: string;
     location_id?: string | null;
 };
+
+export type CreateItemRequest = InventoryRecordRequest & {
+    quantity?: number;
+    category?: string;
+    acquisition_year?: number | null;
+    condition?: "new" | "used";
+    serial_number?: string;
+    estimated_value?: number | null;
+    value_currency?: string | null;
+};
+
+export type UpdateItemRequest = CreateItemRequest;
+
+export type CreateContainerRequest = InventoryRecordRequest & {
+    package_code?: string;
+    gross_weight_kg?: number | null;
+    volume_m3?: number | null;
+    estimated_value?: number | null;
+    value_currency?: string | null;
+};
+
+export type UpdateContainerRequest = CreateContainerRequest;
 
 type LocationRequest = {
     name?: string;
@@ -295,9 +331,9 @@ export const api = {
     listItemsPage: ({ limit, offset }: { limit: number; offset: number }) =>
         request<ItemListResponse>(`/items?limit=${limit}&offset=${offset}`),
     getItem: (id: string) => request<Item>(`/items/${id}`),
-    createItem: (data: InventoryRecordRequest) =>
+    createItem: (data: CreateItemRequest) =>
         request<Item>("/items", { method: "POST", body: JSON.stringify(data) }),
-    updateItem: (id: string, data: InventoryRecordRequest) =>
+    updateItem: (id: string, data: UpdateItemRequest) =>
         request<Item>(`/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteItem: (id: string) =>
         request(`/items/${id}`, { method: "DELETE" }),
@@ -307,9 +343,9 @@ export const api = {
         request<void>(`/items/${itemId}/labels/${labelId}`, { method: "DELETE" }),
     listContainers: () => request<Container[]>("/containers"),
     getContainer: (id: string) => request<Container>(`/containers/${id}`),
-    createContainer: (data: InventoryRecordRequest) =>
+    createContainer: (data: CreateContainerRequest) =>
         request<Container>("/containers", { method: "POST", body: JSON.stringify(data) }),
-    updateContainer: (id: string, data: InventoryRecordRequest) =>
+    updateContainer: (id: string, data: UpdateContainerRequest) =>
         request<Container>(`/containers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteContainer: (id: string) =>
         request<void>(`/containers/${id}`, { method: "DELETE" }),

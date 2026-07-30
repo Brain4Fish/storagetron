@@ -103,6 +103,36 @@ The Compose credentials are development defaults. Replace every secret before us
 - Keeping photo evidence of stored objects and containers.
 - Backing up an inventory database and related object storage as one recoverable unit.
 
+## Moving inventory document data
+
+Items and containers can carry optional structured data for preparing a Russian-language moving inventory. These fields are metadata only: Storagetron does not currently generate customs or moving reports from them.
+
+Item fields:
+
+| API field | Meaning |
+| --- | --- |
+| `quantity` | Positive item count. Defaults to `1`. |
+| `category` | Free-form document category. Defaults to an empty string. |
+| `acquisition_year` | Optional acquisition year stored as a PostgreSQL `SMALLINT`. |
+| `condition` | `new` or `used`. Defaults to `used`. |
+| `serial_number` | Optional serial number. Defaults to an empty string. |
+| `estimated_value` | Optional non-negative estimated value with two decimal places. |
+| `value_currency` | Three-letter ISO-style currency code stored in uppercase. Required exactly when `estimated_value` is set. |
+| `source_language` | Source text language. It is currently server-managed and always returned as `ru`. |
+
+Container fields:
+
+| API field | Meaning |
+| --- | --- |
+| `package_code` | Human-friendly package identifier such as `BX-001`. Non-empty values are unique case-insensitively. |
+| `gross_weight_kg` | Optional positive gross weight in kilograms with three decimal places. |
+| `volume_m3` | Optional positive volume in cubic metres with four decimal places. |
+| `estimated_value` | Optional non-negative estimate for the whole package. A future report generator may use it as an override for the sum of contained item values. |
+| `value_currency` | Three-letter ISO-style currency code stored in uppercase. Required exactly when `estimated_value` is set. |
+| `source_language` | Source text language. It is currently server-managed and always returned as `ru`. |
+
+The web forms suggest `RUB`, `KZT`, `EUR`, and `USD`, while the API accepts any three-letter uppercase code. Nullable value and currency fields must be set or cleared together. The source columns are intentionally stable so future translations can live in separate tables without renaming the existing fields.
+
 ## Configuration
 
 The API requires these environment variables:

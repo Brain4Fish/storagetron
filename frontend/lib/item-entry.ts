@@ -1,4 +1,11 @@
-import { InventoryLabel, Item, PhotoUpload, uploadFileToPresignedUrl } from "./api";
+import {
+    CreateItemRequest,
+    InventoryLabel,
+    Item,
+    PhotoUpload,
+    UpdateItemRequest,
+    uploadFileToPresignedUrl,
+} from "./api";
 
 export const ASSISTED_STEPS = [
     "Item details",
@@ -96,11 +103,12 @@ export type SaveItemInput = {
     labelIds: string[];
     containerId: string;
     files: File[];
+    document?: Omit<CreateItemRequest, "name" | "description" | "location_id">;
 };
 
 type SaveAPI = PhotoUploadAPI & {
-    createItem: (data: { name: string; description?: string; location_id?: string | null }) => Promise<Item>;
-    updateItem: (id: string, data: { name: string; description?: string; location_id?: string | null }) => Promise<Item>;
+    createItem: (data: CreateItemRequest) => Promise<Item>;
+    updateItem: (id: string, data: UpdateItemRequest) => Promise<Item>;
     attachItemLabel: (itemId: string, labelId: string) => Promise<void>;
     detachItemLabel: (itemId: string, labelId: string) => Promise<void>;
     addItemToContainer: (containerId: string, itemId: string) => Promise<void>;
@@ -117,7 +125,12 @@ export async function saveItemEntry(
 ): Promise<SaveItemResult> {
     const progress: SaveItemProgress = { ...current, attachedLabelIds: [...current.attachedLabelIds], uploadedFileKeys: [...current.uploadedFileKeys] };
     const errors: string[] = [];
-    const record = { name: input.name.trim(), description: input.description, location_id: input.locationId || null };
+    const record = {
+        name: input.name.trim(),
+        description: input.description,
+        location_id: input.locationId || null,
+        ...input.document,
+    };
 
     try {
         if (progress.itemId) await api.updateItem(progress.itemId, record);

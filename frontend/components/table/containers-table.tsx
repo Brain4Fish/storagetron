@@ -85,6 +85,10 @@ export function ContainersTable({
                                 </div>
                                 <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                                     <div className="flex items-center gap-2">
+                                        <span className="font-medium text-zinc-700">Номер места:</span>
+                                        <span>{container.package_code || "—"}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
                                         <Box className="h-4 w-4" />
                                         <span>{containerItemCount(container)} items</span>
                                     </div>
@@ -115,7 +119,7 @@ export function ContainersTable({
             </div>
 
             <div className="apple-card hidden overflow-hidden rounded-2xl md:block">
-                <table className="w-full min-w-[820px] text-sm">
+                <table className="w-full min-w-[960px] text-sm">
                     <thead className="bg-zinc-50 text-xs font-medium text-muted-foreground">
                         <tr>
                             {canSelect ? (
@@ -133,6 +137,7 @@ export function ContainersTable({
                                 </th>
                             ) : null}
                             <th className="px-4 py-3 text-left">Container</th>
+                            <th className="px-4 py-3 text-left">Номер грузового места</th>
                             <th className="px-4 py-3 text-left">Location</th>
                             <th className="px-4 py-3 text-left">Items</th>
                             <th className="px-4 py-3 text-left">Labels</th>
@@ -178,6 +183,7 @@ export function ContainersTable({
                                         </div>
                                     </div>
                                 </td>
+                                <td className="whitespace-nowrap px-4 py-3">{container.package_code || "—"}</td>
                                 <td className="px-4 py-3">
                                     {formatLocation(container.location) ? (
                                         <span>{formatLocation(container.location)}</span>

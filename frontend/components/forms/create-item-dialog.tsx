@@ -26,6 +26,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableLabelPicker } from "@/components/labels/searchable-label-picker";
 import { PrintLabelDialog } from "@/components/print-label-dialog";
+import {
+    initialItemDocumentDraft,
+    ItemDocumentDraft,
+    ItemDocumentFields,
+    itemDocumentPayload,
+    validateItemDocumentDraft,
+} from "@/components/forms/document-fields";
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void };
 
@@ -39,6 +46,7 @@ export function CreateItemDialog({ open, onOpenChange }: Props) {
     const [description, setDescription] = useState("");
     const [locationId, setLocationId] = useState("");
     const [containerId, setContainerId] = useState("");
+    const [documentData, setDocumentData] = useState<ItemDocumentDraft>(initialItemDocumentDraft);
     const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
     const [files, setFiles] = useState<File[]>([]);
     const [photoProgress, setPhotoProgress] = useState<Record<string, number>>({});
@@ -55,6 +63,7 @@ export function CreateItemDialog({ open, onOpenChange }: Props) {
 
     const reset = (keepAssisted = assisted) => {
         setName(""); setDescription(""); setLocationId(""); setContainerId(""); setSelectedLabelIds([]); setFiles([]);
+        setDocumentData(initialItemDocumentDraft());
         setPhotoProgress({}); setProgress(initialSaveItemProgress()); setGuide(initialAssistedEntryState()); setError(""); setExitConfirm(false); setAssisted(keepAssisted);
     };
     const closeNow = () => { reset(false); onOpenChange(false); };
@@ -65,11 +74,21 @@ export function CreateItemDialog({ open, onOpenChange }: Props) {
         queryClient.invalidateQueries({ queryKey: ["containers"] }),
         progress.itemId ? queryClient.invalidateQueries({ queryKey: ["item", progress.itemId] }) : Promise.resolve(),
     ]);
-    const input = { name, description, locationId, labelIds: selectedLabelIds, containerId, files };
+    const input = {
+        name,
+        description,
+        locationId,
+        labelIds: selectedLabelIds,
+        containerId,
+        files,
+        document: itemDocumentPayload(documentData),
+    };
 
     const save = async (options: { includePhotos?: boolean; includeContainer?: boolean } = {}) => {
         setError("");
         if (!name.trim()) { setError("Name is required."); return false; }
+        const documentError = validateItemDocumentDraft(documentData);
+        if (documentError) { setError(documentError); return false; }
         const result = await saveItemEntry(api, input, progress, {
             ...options,
             onPhotoProgress: (key, value) => setPhotoProgress((current) => ({ ...current, [key]: value })),
@@ -124,6 +143,7 @@ export function CreateItemDialog({ open, onOpenChange }: Props) {
                 <div className="min-h-0 overflow-y-auto p-6 sm:p-8"><AssistedStepContent
                     step={guide.stepIndex} name={name} setName={setName} description={description} setDescription={setDescription}
                     locationId={locationId} setLocationId={setLocationId} containerId={containerId} setContainerId={setContainerId}
+                    documentData={documentData} setDocumentData={setDocumentData}
                     locations={locations} containers={containers} labels={labels} selectedLabelIds={selectedLabelIds} setSelectedLabelIds={setSelectedLabelIds}
                     createLabel={(data) => createLabelMutation.mutateAsync(data)} isCreatingLabel={createLabelMutation.isPending}
                     files={files} setFiles={setFiles} photoProgress={photoProgress} itemId={progress.itemId} busy={busy} error={error}
@@ -132,7 +152,7 @@ export function CreateItemDialog({ open, onOpenChange }: Props) {
                     onAddAnother={addAnother} onViewItem={viewItem} onClose={requestClose}
                 /></div>
             </div> : <form onSubmit={submitStandard} className="min-h-0 flex-1 overflow-y-auto">
-                <div className="space-y-4 p-5 sm:p-6"><ItemDetailsFields compact name={name} setName={setName} description={description} setDescription={setDescription} locationId={locationId} setLocationId={setLocationId} containerId={containerId} setContainerId={setContainerId} locations={locations} containers={containers} labels={labels} selectedLabelIds={selectedLabelIds} setSelectedLabelIds={setSelectedLabelIds} createLabel={(data) => createLabelMutation.mutateAsync(data)} isCreatingLabel={createLabelMutation.isPending} photoSlot={<PhotoPicker compact files={files} onChange={setFiles} progress={photoProgress} />} />
+                <div className="space-y-4 p-5 sm:p-6"><ItemDetailsFields compact name={name} setName={setName} description={description} setDescription={setDescription} locationId={locationId} setLocationId={setLocationId} containerId={containerId} setContainerId={setContainerId} documentData={documentData} setDocumentData={setDocumentData} locations={locations} containers={containers} labels={labels} selectedLabelIds={selectedLabelIds} setSelectedLabelIds={setSelectedLabelIds} createLabel={(data) => createLabelMutation.mutateAsync(data)} isCreatingLabel={createLabelMutation.isPending} photoSlot={<PhotoPicker compact files={files} onChange={setFiles} progress={photoProgress} />} />
                     {error ? <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-destructive">{error}</p> : null}
                 </div>
                 <DialogFooter className="sticky bottom-0 mt-0 border-t bg-white px-6 py-3"><Button variant="outline" onClick={requestClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving..." : progress.itemId ? "Retry setup" : "Create item"}</Button></DialogFooter>
@@ -149,6 +169,7 @@ export function CreateItemDialog({ open, onOpenChange }: Props) {
 type SharedFields = {
     name: string; setName: (value: string) => void; description: string; setDescription: (value: string) => void;
     locationId: string; setLocationId: (value: string) => void; containerId: string; setContainerId: (value: string) => void;
+    documentData: ItemDocumentDraft; setDocumentData: (value: ItemDocumentDraft) => void;
     locations: Awaited<ReturnType<typeof api.listLocations>>; containers: Awaited<ReturnType<typeof api.listContainers>>; labels: InventoryLabel[];
     selectedLabelIds: string[]; setSelectedLabelIds: (value: string[]) => void; createLabel: (data: Parameters<typeof api.createLabel>[0]) => Promise<InventoryLabel>; isCreatingLabel: boolean;
 };
@@ -158,6 +179,7 @@ function ItemDetailsFields(props: SharedFields & { photoSlot?: ReactNode; compac
         {props.photoSlot}
         <div className={props.compact ? "space-y-1.5" : "space-y-2"}><div className="flex justify-between"><Label htmlFor="new-item-description">Description <span className="font-normal text-muted-foreground">(optional)</span></Label><span className="text-xs text-muted-foreground">{props.description.length}/500</span></div><Textarea id="new-item-description" value={props.description} onChange={(event) => props.setDescription(event.target.value)} maxLength={500} placeholder="Add details about this item..." className={cn("rounded-xl", props.compact ? "min-h-20" : "min-h-28")} /></div>
         <div className={cn("grid sm:grid-cols-2", props.compact ? "gap-4" : "gap-5")}><SelectField compact={props.compact} id="new-item-location" label="Location" value={props.locationId} onChange={props.setLocationId}><option value="">No location</option>{props.locations.map((location) => <option key={location.id} value={location.id}>{formatLocation(location)}</option>)}</SelectField><SelectField compact={props.compact} id="new-item-container" label="Container" value={props.containerId} onChange={props.setContainerId}><option value="">No container</option>{props.containers.map((container) => <option key={container.id} value={container.id}>{container.name}</option>)}</SelectField></div>
+        <ItemDocumentFields value={props.documentData} onChange={props.setDocumentData} idPrefix="new-item-document" />
         <div className={props.compact ? "space-y-1.5" : "space-y-2"}><Label>Labels <span className="font-normal text-muted-foreground">(optional)</span></Label><SearchableLabelPicker compact={props.compact} labels={props.labels} selectedIds={props.selectedLabelIds} onChange={props.setSelectedLabelIds} onCreate={props.createLabel} isCreating={props.isCreatingLabel} /></div>
     </div>;
 }

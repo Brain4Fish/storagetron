@@ -45,9 +45,23 @@ test("cleanup failure is surfaced explicitly", async () => {
 test("save coordinator retries only incomplete label and container operations", async () => {
     const calls: string[] = [];
     let failLabel = true;
+    const savedItem = {
+        id: "item-1",
+        name: "Camera",
+        created_at: "",
+        labels: [],
+        quantity: 1,
+        category: "",
+        acquisition_year: null,
+        condition: "used" as const,
+        serial_number: "",
+        estimated_value: null,
+        value_currency: null,
+        source_language: "ru",
+    };
     const adapter = {
-        createItem: async () => ({ id: "item-1", name: "Camera", created_at: "", labels: [] }),
-        updateItem: async () => ({ id: "item-1", name: "Camera", created_at: "", labels: [] }),
+        createItem: async () => savedItem,
+        updateItem: async () => savedItem,
         attachItemLabel: async (_itemId: string, labelId: string) => { calls.push(`attach:${labelId}`); if (labelId === "b" && failLabel) throw new Error("label failed"); },
         detachItemLabel: async () => undefined,
         createPhotoUpload: async () => ({ photo_id: "photo", object_key: "key", upload_url: "url" }),

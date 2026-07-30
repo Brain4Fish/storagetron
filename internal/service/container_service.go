@@ -12,7 +12,7 @@ type ContainerRepository interface {
 	Create(context.Context, model.Container, string) error
 	List(context.Context) ([]model.Container, error)
 	Get(context.Context, uuid.UUID) (model.Container, error)
-	Update(context.Context, uuid.UUID, model.UpdateContainerRequest) error
+	Update(context.Context, uuid.UUID, model.Container) error
 	Delete(context.Context, uuid.UUID) error
 	AddItem(context.Context, uuid.UUID, uuid.UUID) error
 	RemoveItem(context.Context, uuid.UUID, uuid.UUID) error
@@ -33,12 +33,11 @@ func NewContainerService(r ContainerRepository, photoSvc *PhotoService) *Contain
 }
 
 func (s *ContainerService) Create(ctx context.Context, req model.CreateContainerRequest) (model.Container, error) {
-	container := model.Container{
-		ID:          uuid.New(),
-		Name:        req.Name,
-		Description: req.Description,
-		LocationID:  req.LocationID,
+	container, err := containerFromCreateRequest(req)
+	if err != nil {
+		return model.Container{}, err
 	}
+	container.ID = uuid.New()
 	if err := s.repo.Create(ctx, container, req.LabelCode); err != nil {
 		return model.Container{}, err
 	}
@@ -86,7 +85,14 @@ func (s *ContainerService) Get(ctx context.Context, id uuid.UUID) (model.Contain
 }
 
 func (s *ContainerService) Update(ctx context.Context, id uuid.UUID, req model.UpdateContainerRequest) (model.Container, error) {
-	if err := s.repo.Update(ctx, id, req); err != nil {
+	container, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return model.Container{}, err
+	}
+	if err := applyContainerUpdate(&container, req); err != nil {
+		return model.Container{}, err
+	}
+	if err := s.repo.Update(ctx, id, container); err != nil {
 		return model.Container{}, err
 	}
 	return s.repo.Get(ctx, id)

@@ -12,6 +12,7 @@ import (
 	"github.com/Brain4Fish/storagetron/pkg/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 )
@@ -35,17 +36,21 @@ func TestRepositoryIntegrationItemContainerLabelsAndInheritedLocation(t *testing
 
 	containerID := uuid.New()
 	require.NoError(t, containerRepo.Create(ctx, model.Container{
-		ID:          containerID,
-		Name:        "Box 07",
-		Description: "Desk gear",
-		LocationID:  &containerLocationID,
+		ID:             containerID,
+		Name:           "Box 07",
+		Description:    "Desk gear",
+		LocationID:     &containerLocationID,
+		SourceLanguage: "ru",
 	}, "BOX-007"))
 
 	itemID := uuid.New()
 	require.NoError(t, itemRepo.Create(ctx, model.Item{
-		ID:          itemID,
-		Name:        "Keyboard",
-		Description: "Split keyboard",
+		ID:             itemID,
+		Name:           "Keyboard",
+		Description:    "Split keyboard",
+		Quantity:       1,
+		Condition:      "used",
+		SourceLanguage: "ru",
 	}, "ITEM-KEYBOARD"))
 	require.NoError(t, containerRepo.AddItem(ctx, containerID, itemID))
 
@@ -70,6 +75,111 @@ func TestRepositoryIntegrationItemContainerLabelsAndInheritedLocation(t *testing
 	require.ErrorIs(t, err, pgx.ErrNoRows)
 }
 
+func TestRepositoryIntegrationDocumentFieldsRoundTripAndPackageCodeUniqueness(t *testing.T) {
+	pool := repositoryIntegrationPool(t)
+	ctx := context.Background()
+	itemRepo := NewItemRepo(pool)
+	containerRepo := NewContainerRepo(pool)
+
+	year := int16(2022)
+	itemValue := 1234.56
+	rub := "RUB"
+	item := model.Item{
+		ID:              uuid.New(),
+		Name:            "Monitor",
+		Description:     "27 inch",
+		Quantity:        2,
+		Category:        "Electronics",
+		AcquisitionYear: &year,
+		Condition:       "used",
+		SerialNumber:    "MON-123",
+		EstimatedValue:  &itemValue,
+		ValueCurrency:   &rub,
+		SourceLanguage:  "ru",
+	}
+	require.NoError(t, itemRepo.Create(ctx, item, ""))
+
+	storedItem, err := itemRepo.Get(ctx, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, storedItem.Quantity)
+	require.Equal(t, "Electronics", storedItem.Category)
+	require.Equal(t, &year, storedItem.AcquisitionYear)
+	require.Equal(t, "used", storedItem.Condition)
+	require.Equal(t, "MON-123", storedItem.SerialNumber)
+	require.InDelta(t, itemValue, *storedItem.EstimatedValue, 0.001)
+	require.Equal(t, "RUB", *storedItem.ValueCurrency)
+	require.Equal(t, "ru", storedItem.SourceLanguage)
+
+	items, err := itemRepo.List(ctx)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, 2, items[0].Quantity)
+
+	storedItem.AcquisitionYear = nil
+	storedItem.EstimatedValue = nil
+	storedItem.ValueCurrency = nil
+	require.NoError(t, itemRepo.Update(ctx, storedItem.ID, storedItem))
+	storedItem, err = itemRepo.Get(ctx, storedItem.ID)
+	require.NoError(t, err)
+	require.Nil(t, storedItem.AcquisitionYear)
+	require.Nil(t, storedItem.EstimatedValue)
+	require.Nil(t, storedItem.ValueCurrency)
+
+	weight := 12.345
+	volume := 0.1234
+	containerValue := 2500.75
+	container := model.Container{
+		ID:             uuid.New(),
+		Name:           "Moving box",
+		PackageCode:    "BX-001",
+		GrossWeightKg:  &weight,
+		VolumeM3:       &volume,
+		EstimatedValue: &containerValue,
+		ValueCurrency:  &rub,
+		SourceLanguage: "ru",
+	}
+	require.NoError(t, containerRepo.Create(ctx, container, ""))
+
+	storedContainer, err := containerRepo.Get(ctx, container.ID)
+	require.NoError(t, err)
+	require.Equal(t, "BX-001", storedContainer.PackageCode)
+	require.InDelta(t, weight, *storedContainer.GrossWeightKg, 0.0001)
+	require.InDelta(t, volume, *storedContainer.VolumeM3, 0.00001)
+	require.InDelta(t, containerValue, *storedContainer.EstimatedValue, 0.001)
+	require.Equal(t, "RUB", *storedContainer.ValueCurrency)
+	require.Equal(t, "ru", storedContainer.SourceLanguage)
+
+	containers, err := containerRepo.List(ctx)
+	require.NoError(t, err)
+	require.Len(t, containers, 1)
+	require.Equal(t, "BX-001", containers[0].PackageCode)
+
+	err = containerRepo.Create(ctx, model.Container{
+		ID:             uuid.New(),
+		Name:           "Duplicate code",
+		PackageCode:    "bx-001",
+		SourceLanguage: "ru",
+	}, "")
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, "23505", pgErr.Code)
+	require.Equal(t, "idx_containers_package_code_ci", pgErr.ConstraintName)
+
+	storedContainer.PackageCode = "BX-002"
+	storedContainer.GrossWeightKg = nil
+	storedContainer.VolumeM3 = nil
+	storedContainer.EstimatedValue = nil
+	storedContainer.ValueCurrency = nil
+	require.NoError(t, containerRepo.Update(ctx, storedContainer.ID, storedContainer))
+	storedContainer, err = containerRepo.Get(ctx, storedContainer.ID)
+	require.NoError(t, err)
+	require.Equal(t, "BX-002", storedContainer.PackageCode)
+	require.Nil(t, storedContainer.GrossWeightKg)
+	require.Nil(t, storedContainer.VolumeM3)
+	require.Nil(t, storedContainer.EstimatedValue)
+	require.Nil(t, storedContainer.ValueCurrency)
+}
+
 func TestRepositoryIntegrationPhotoCreateListAndDelete(t *testing.T) {
 	pool := repositoryIntegrationPool(t)
 	ctx := context.Background()
@@ -77,7 +187,9 @@ func TestRepositoryIntegrationPhotoCreateListAndDelete(t *testing.T) {
 	itemRepo := NewItemRepo(pool)
 	photoRepo := NewPhotoRepo(pool)
 	itemID := uuid.New()
-	require.NoError(t, itemRepo.Create(ctx, model.Item{ID: itemID, Name: "Camera"}, "ITEM-CAMERA"))
+	require.NoError(t, itemRepo.Create(ctx, model.Item{
+		ID: itemID, Name: "Camera", Quantity: 1, Condition: "used", SourceLanguage: "ru",
+	}, "ITEM-CAMERA"))
 
 	photoID := uuid.New()
 	require.NoError(t, photoRepo.Create(ctx, model.Photo{
@@ -118,8 +230,12 @@ func TestRepositoryIntegrationReusableLabelsAndInheritance(t *testing.T) {
 
 	itemID := uuid.New()
 	containerID := uuid.New()
-	require.NoError(t, itemRepo.Create(ctx, model.Item{ID: itemID, Name: "Camera"}, "SCAN-CAMERA"))
-	require.NoError(t, containerRepo.Create(ctx, model.Container{ID: containerID, Name: "Gear box"}, "SCAN-BOX"))
+	require.NoError(t, itemRepo.Create(ctx, model.Item{
+		ID: itemID, Name: "Camera", Quantity: 1, Condition: "used", SourceLanguage: "ru",
+	}, "SCAN-CAMERA"))
+	require.NoError(t, containerRepo.Create(ctx, model.Container{
+		ID: containerID, Name: "Gear box", SourceLanguage: "ru",
+	}, "SCAN-BOX"))
 	require.NoError(t, containerRepo.AddItem(ctx, containerID, itemID))
 
 	label, err := labelRepo.Create(ctx, model.Label{ID: uuid.New(), Name: "Electronics", Color: "blue"})

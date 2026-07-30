@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
-import { api, ApiError, photoContentUrl } from "@/lib/api";
+import { api, ApiError, photoContentUrl, UpdateItemRequest } from "@/lib/api";
 import { buildItemRows } from "@/lib/inventory-view";
 import { downloadSelectedAssetsXlsx } from "@/lib/export-assets";
 import { PageShell } from "@/components/page-shell";
@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import { LabelList } from "@/components/labels/label-chip";
 import { labelSelectionDiff } from "@/lib/labels";
+import { DocumentDataCard } from "@/components/document-data-card";
 
 export default function ItemDetailsPage() {
     const params = useParams();
@@ -62,7 +63,7 @@ export default function ItemDetailsPage() {
     const selectedLabelIds = useMemo(() => (data?.labels ?? []).map((label) => label.id), [data?.labels]);
 
     const updateMutation = useMutation({
-        mutationFn: async (payload: { name: string; description: string; location_id?: string | null; label_ids?: string[] }) => {
+        mutationFn: async (payload: UpdateItemRequest & { label_ids?: string[] }) => {
             const { label_ids = [], ...record } = payload;
             await api.updateItem(id, record);
             const diff = labelSelectionDiff(data?.labels ?? [], label_ids);
@@ -160,7 +161,8 @@ export default function ItemDetailsPage() {
                 </header>
 
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-                    <section className="apple-card rounded-2xl p-4">
+                    <div className="space-y-4">
+                        <section className="apple-card rounded-2xl p-4">
                         <div className="grid gap-6 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1fr)]">
                             <div className="overflow-hidden rounded-2xl border border-border bg-zinc-100">
                                 <div className="relative aspect-[4/3]">
@@ -216,7 +218,9 @@ export default function ItemDetailsPage() {
                                 {exportError ? <p className="mt-3 text-sm text-destructive">{exportError}</p> : null}
                             </div>
                         </div>
-                    </section>
+                        </section>
+                        <DocumentDataCard kind="item" value={data} />
+                    </div>
 
                     <aside className="space-y-4">
                         <section className="apple-card rounded-2xl p-5">
@@ -290,6 +294,7 @@ export default function ItemDetailsPage() {
                 locations={locations}
                 labels={labels}
                 selectedLabelIds={selectedLabelIds}
+                documentRecord={{ kind: "item", value: data }}
                 isSaving={updateMutation.isPending}
                 error={editError}
                 onOpenChange={setEditOpen}

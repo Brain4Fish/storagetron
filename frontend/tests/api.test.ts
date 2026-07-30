@@ -57,6 +57,44 @@ test("label attachment methods use idempotent PUT and matching DELETE routes", a
     assert.equal(calls[1].init?.method, "DELETE");
 });
 
+test("inventory API serializes document fields and explicit nullable clears", async () => {
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ input, init });
+        return Response.json({});
+    };
+
+    await api.createItem({
+        name: "Camera",
+        quantity: 2,
+        condition: "used",
+        estimated_value: 1250.5,
+        value_currency: "RUB",
+    });
+    await api.updateContainer("container-1", {
+        name: "Box",
+        gross_weight_kg: null,
+        volume_m3: null,
+        estimated_value: null,
+        value_currency: null,
+    });
+
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
+        name: "Camera",
+        quantity: 2,
+        condition: "used",
+        estimated_value: 1250.5,
+        value_currency: "RUB",
+    });
+    assert.deepEqual(JSON.parse(String(calls[1].init?.body)), {
+        name: "Box",
+        gross_weight_kg: null,
+        volume_m3: null,
+        estimated_value: null,
+        value_currency: null,
+    });
+});
+
 test("api methods surface JSON error messages with status code", async () => {
     global.fetch = async () => Response.json({ error: "item not found" }, { status: 404 });
 

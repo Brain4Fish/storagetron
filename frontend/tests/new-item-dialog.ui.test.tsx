@@ -1,12 +1,29 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, test, expect } from "vitest";
 import { CreateItemDialog } from "@/components/forms/create-item-dialog";
 import { api } from "@/lib/api";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
+function savedItem(id: string) {
+    return {
+        id,
+        name: "Camera",
+        created_at: "",
+        labels: [],
+        quantity: 1,
+        category: "",
+        acquisition_year: null,
+        condition: "used" as const,
+        serial_number: "",
+        estimated_value: null,
+        value_currency: null,
+        source_language: "ru",
+    };
+}
 
 function renderDialog() {
     vi.spyOn(api, "listLocations").mockResolvedValue([]);
@@ -24,8 +41,32 @@ test("standard entry exposes the reference fields and validates the required nam
     expect(screen.getByLabelText(/Description/)).toHaveAttribute("maxlength", "500");
 });
 
+test("standard entry creates an item with document fields", async () => {
+    const createItem = vi.spyOn(api, "createItem").mockResolvedValue(savedItem("item-doc"));
+    renderDialog();
+
+    await userEvent.type(screen.getByLabelText(/Name/), "Camera");
+    await userEvent.click(screen.getByText("Данные для документов"));
+    await userEvent.clear(screen.getByLabelText("Количество"));
+    await userEvent.type(screen.getByLabelText("Количество"), "2");
+    await userEvent.type(screen.getByLabelText("Категория"), "Электроника");
+    await userEvent.type(screen.getByLabelText("Оценочная стоимость"), "1250.50");
+    await userEvent.selectOptions(screen.getByLabelText("Валюта"), "RUB");
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => expect(createItem).toHaveBeenCalled());
+    expect(createItem).toHaveBeenCalledWith(expect.objectContaining({
+        name: "Camera",
+        quantity: 2,
+        category: "Электроника",
+        condition: "used",
+        estimated_value: 1250.5,
+        value_currency: "RUB",
+    }));
+});
+
 test("assisted mode advances after card creation and warns before closing", async () => {
-    vi.spyOn(api, "createItem").mockResolvedValue({ id: "item-1", name: "Camera", created_at: "", labels: [] });
+    vi.spyOn(api, "createItem").mockResolvedValue(savedItem("item-1"));
     renderDialog();
     await userEvent.click(screen.getByRole("switch", { name: "Assisted entry" }));
     expect(screen.getByText("Create the item card")).toBeInTheDocument();
@@ -38,7 +79,7 @@ test("assisted mode advances after card creation and warns before closing", asyn
 });
 
 test("assisted optional steps can be skipped and add another resets the guide", async () => {
-    vi.spyOn(api, "createItem").mockResolvedValue({ id: "item-2", name: "Camera", created_at: "", labels: [] });
+    vi.spyOn(api, "createItem").mockResolvedValue(savedItem("item-2"));
     renderDialog();
     await userEvent.click(screen.getByRole("switch", { name: "Assisted entry" }));
     await userEvent.type(screen.getByLabelText(/Name/), "Camera");
