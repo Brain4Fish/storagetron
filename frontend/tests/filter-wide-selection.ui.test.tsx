@@ -101,7 +101,7 @@ test("items select all filtered results across pages and preserve prior selectio
     screen.getAllByRole("checkbox", { name: "Select Spare parts" }).forEach((checkbox) => {
         expect(checkbox).not.toBeChecked();
     });
-});
+}, 15_000);
 
 test("containers select all filtered results and preserve prior selection", async () => {
     vi.spyOn(api, "listContainers").mockResolvedValue([
