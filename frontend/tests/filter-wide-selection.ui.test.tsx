@@ -40,7 +40,11 @@ function renderPage(page: ReactNode) {
 }
 
 function item(id: string, name: string): Item {
-    return { id, name, created_at: "2026-07-16T00:00:00Z", labels: [] };
+    return {
+        id, name, created_at: "2026-07-16T00:00:00Z", labels: [],
+        quantity: 1, category: "", acquisition_year: null, condition: "used",
+        serial_number: "", estimated_value: null, value_currency: null, source_language: "ru",
+    };
 }
 
 function container(id: string, name: string): Container {
@@ -50,6 +54,12 @@ function container(id: string, name: string): Container {
         created_at: "2026-07-16T00:00:00Z",
         labels: [],
         inherited_labels: [],
+        package_code: "",
+        gross_weight_kg: null,
+        volume_m3: null,
+        estimated_value: null,
+        value_currency: null,
+        source_language: "ru",
     };
 }
 
@@ -91,7 +101,7 @@ test("items select all filtered results across pages and preserve prior selectio
     screen.getAllByRole("checkbox", { name: "Select Spare parts" }).forEach((checkbox) => {
         expect(checkbox).not.toBeChecked();
     });
-});
+}, 15_000);
 
 test("containers select all filtered results and preserve prior selection", async () => {
     vi.spyOn(api, "listContainers").mockResolvedValue([

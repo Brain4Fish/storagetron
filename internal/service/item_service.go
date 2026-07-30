@@ -13,7 +13,7 @@ type ItemRepo interface {
 	List(context.Context) ([]model.Item, error)
 	ListPage(context.Context, int, int) ([]model.Item, int, error)
 	Get(context.Context, uuid.UUID) (model.Item, error)
-	Update(context.Context, uuid.UUID, model.UpdateItemRequest) error
+	Update(context.Context, uuid.UUID, model.Item) error
 	Delete(context.Context, uuid.UUID) error
 	AttachLabel(context.Context, uuid.UUID, uuid.UUID) error
 	DetachLabel(context.Context, uuid.UUID, uuid.UUID) error
@@ -34,12 +34,11 @@ func NewItemService(r ItemRepo, photoSvc *PhotoService) *ItemService {
 }
 
 func (s *ItemService) Create(ctx context.Context, req model.CreateItemRequest) (model.Item, error) {
-	item := model.Item{
-		ID:          uuid.New(),
-		Name:        req.Name,
-		Description: req.Description,
-		LocationID:  req.LocationID,
+	item, err := itemFromCreateRequest(req)
+	if err != nil {
+		return model.Item{}, err
 	}
+	item.ID = uuid.New()
 	if err := s.repo.Create(ctx, item, req.LabelCode); err != nil {
 		return model.Item{}, err
 	}
@@ -101,7 +100,14 @@ func (s *ItemService) Get(ctx context.Context, id uuid.UUID) (model.Item, error)
 }
 
 func (s *ItemService) Update(ctx context.Context, id uuid.UUID, req model.UpdateItemRequest) (model.Item, error) {
-	if err := s.repo.Update(ctx, id, req); err != nil {
+	item, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return model.Item{}, err
+	}
+	if err := applyItemUpdate(&item, req); err != nil {
+		return model.Item{}, err
+	}
+	if err := s.repo.Update(ctx, id, item); err != nil {
 		return model.Item{}, err
 	}
 	return s.Get(ctx, id)

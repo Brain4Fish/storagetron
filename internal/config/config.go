@@ -6,26 +6,28 @@ import (
 )
 
 type Config struct {
-	DatabaseURL      string
-	S3Endpoint       string
-	S3PublicEndpoint string
-	S3Bucket         string
-	S3AccessKey      string
-	S3SecretKey      string
-	BackupSecretKey  string
-	BackupTempDir    string
+	DatabaseURL             string
+	S3Endpoint              string
+	S3PublicEndpoint        string
+	S3Bucket                string
+	S3AccessKey             string
+	S3SecretKey             string
+	BackupSecretKey         string
+	BackupTempDir           string
+	DocumentationReportsDir string
 }
 
 func MustLoad() Config {
 	cfg := Config{
-		DatabaseURL:      os.Getenv("DATABASE_URL"),
-		S3Endpoint:       os.Getenv("S3_ENDPOINT"),
-		S3PublicEndpoint: os.Getenv("S3_PUBLIC_ENDPOINT"),
-		S3Bucket:         os.Getenv("S3_BUCKET"),
-		S3AccessKey:      os.Getenv("S3_ACCESS_KEY"),
-		S3SecretKey:      os.Getenv("S3_SECRET_KEY"),
-		BackupSecretKey:  os.Getenv("BACKUP_SECRET_KEY"),
-		BackupTempDir:    os.Getenv("BACKUP_TEMP_DIR"),
+		DatabaseURL:             os.Getenv("DATABASE_URL"),
+		S3Endpoint:              os.Getenv("S3_ENDPOINT"),
+		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
+		S3Bucket:                os.Getenv("S3_BUCKET"),
+		S3AccessKey:             os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:             os.Getenv("S3_SECRET_KEY"),
+		BackupSecretKey:         os.Getenv("BACKUP_SECRET_KEY"),
+		BackupTempDir:           os.Getenv("BACKUP_TEMP_DIR"),
+		DocumentationReportsDir: envOrDefault("DOCUMENTATION_REPORTS_DIR", "./data/reports"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -51,4 +53,11 @@ func MustLoad() Config {
 	}
 
 	return cfg
+}
+
+func envOrDefault(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 )
 
@@ -42,6 +43,14 @@ func (h *ContainerHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	container, err := h.svc.Create(ctx, req)
 	if err != nil {
+		if service.IsValidationError(err) {
+			respondErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if isPackageCodeConflict(err) {
+			respondErr(w, http.StatusConflict, "package_code already exists")
+			return
+		}
 		h.logger.Error("create container failed", zap.Error(err))
 		respondErr(w, http.StatusInternalServerError, "failed to create container")
 		return
@@ -119,6 +128,14 @@ func (h *ContainerHandler) Update(w http.ResponseWriter, r *http.Request) {
 			respondErr(w, http.StatusNotFound, "container not found")
 			return
 		}
+		if service.IsValidationError(err) {
+			respondErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if isPackageCodeConflict(err) {
+			respondErr(w, http.StatusConflict, "package_code already exists")
+			return
+		}
 		h.logger.Error("update container failed", zap.Error(err), zap.String("container_id", id.String()))
 		respondErr(w, http.StatusInternalServerError, "failed to update container")
 		return
@@ -126,6 +143,13 @@ func (h *ContainerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(container)
+}
+
+func isPackageCodeConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) &&
+		pgErr.Code == "23505" &&
+		pgErr.ConstraintName == "idx_containers_package_code_ci"
 }
 
 func (h *ContainerHandler) Delete(w http.ResponseWriter, r *http.Request) {

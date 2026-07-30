@@ -7,6 +7,26 @@ import { PrintLabelDialog } from "@/components/print-label-dialog";
 import { ItemsTable } from "@/components/table/items-table";
 import { ContainersTable } from "@/components/table/containers-table";
 
+const itemDocumentDefaults = {
+    quantity: 1,
+    category: "",
+    acquisition_year: null,
+    condition: "used" as const,
+    serial_number: "",
+    estimated_value: null,
+    value_currency: null,
+    source_language: "ru",
+};
+
+const containerDocumentDefaults = {
+    package_code: "",
+    gross_weight_kg: null,
+    volume_m3: null,
+    estimated_value: null,
+    value_currency: null,
+    source_language: "ru",
+};
+
 test("searchable labels filter, select, remove, and create inline", async () => {
     const onChange = vi.fn();
     const onCreate = vi.fn().mockResolvedValue({ id: "new", name: "Travel", color: "blue", created_at: "", updated_at: "" });
@@ -42,8 +62,8 @@ test("print label reports the print attempt before opening the browser dialog", 
 });
 
 test("desktop item metadata columns stay on one line", () => {
-    const item = { id: "item-1", name: "Camera", created_at: "2026-07-12T00:00:00Z", labels: [] };
-    const view = render(<ItemsTable rows={[{ item, locationLabel: "No location", containerLabel: "No container", status: "loose", searchText: "camera" }]} selectedItemIds={new Set()} onToggleItem={vi.fn()} onToggleItems={vi.fn()} />);
+    const item = { ...itemDocumentDefaults, id: "item-1", name: "Camera", created_at: "2026-07-12T00:00:00Z", labels: [] };
+    const view = render(<ItemsTable rows={[{ item, locationLabel: "No location", containerLabel: "No container", status: "loose", searchableText: "camera" }]} selectedItemIds={new Set()} onToggleItem={vi.fn()} onToggleItems={vi.fn()} />);
     const table = view.container.querySelector("table");
     expect(table).toHaveClass("min-w-[1120px]");
     const cells = Array.from(table?.querySelectorAll("td") ?? []);
@@ -55,17 +75,19 @@ test("desktop item metadata columns stay on one line", () => {
 
 test("item thumbnails use stable optimized photo URLs at responsive display sizes", () => {
     const item = {
+        ...itemDocumentDefaults,
         id: "item-photo",
         name: "Camera",
         created_at: "2026-07-12T00:00:00Z",
         labels: [],
         photos: [{
             id: "photo-1",
+            object_key: "items/photo.jpg",
             url: "https://storage.test/legacy-signed-photo",
             content_url: "/api/photos/photo-1/content",
         }],
     };
-    const view = render(<ItemsTable rows={[{ item, locationLabel: "No location", containerLabel: "No container", status: "loose", searchText: "camera" }]} selectedItemIds={new Set()} onToggleItem={vi.fn()} onToggleItems={vi.fn()} />);
+    const view = render(<ItemsTable rows={[{ item, locationLabel: "No location", containerLabel: "No container", status: "loose", searchableText: "camera" }]} selectedItemIds={new Set()} onToggleItem={vi.fn()} onToggleItems={vi.fn()} />);
 
     const images = Array.from(view.container.querySelectorAll("img"));
     expect(images).toHaveLength(2);
@@ -79,6 +101,7 @@ test("mobile container cards place selection in the metadata footer", () => {
     const view = render(
         <ContainersTable
             containers={[{
+                ...containerDocumentDefaults,
                 id: "container-1",
                 name: "Camera box",
                 created_at: "2026-07-16T00:00:00Z",
@@ -97,4 +120,39 @@ test("mobile container cards place selection in the metadata footer", () => {
     expect(checkbox?.parentElement?.tagName).toBe("LABEL");
     expect(checkbox?.parentElement?.parentElement).toHaveClass("justify-between");
     expect(mobileCard?.querySelector(":scope > div > input")).toBeNull();
+});
+
+test("inventory tables expose quantity and package code identifiers", () => {
+    const item = {
+        ...itemDocumentDefaults,
+        id: "item-quantity",
+        name: "Cable set",
+        quantity: 3,
+        created_at: "2026-07-12T00:00:00Z",
+        labels: [],
+    };
+    const itemView = render(
+        <ItemsTable
+            rows={[{ item, locationLabel: "No location", containerLabel: "No container", status: "loose", searchableText: "cable" }]}
+            selectedItemIds={new Set()}
+            onToggleItem={vi.fn()}
+            onToggleItems={vi.fn()}
+        />,
+    );
+    expect(itemView.getByText("Количество: 3")).toBeInTheDocument();
+    expect(itemView.getAllByText("3")).not.toHaveLength(0);
+    itemView.unmount();
+
+    const containerView = render(
+        <ContainersTable containers={[{
+            ...containerDocumentDefaults,
+            id: "container-code",
+            name: "Moving box",
+            package_code: "BX-001",
+            created_at: "2026-07-16T00:00:00Z",
+            labels: [],
+            inherited_labels: [],
+        }]} />,
+    );
+    expect(containerView.getAllByText("BX-001")).toHaveLength(2);
 });

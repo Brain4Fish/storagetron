@@ -149,7 +149,7 @@ func (r *scanItemRepo) Get(context.Context, uuid.UUID) (model.Item, error) {
 	return r.item, r.itemErr
 }
 
-func (r *scanItemRepo) Update(context.Context, uuid.UUID, model.UpdateItemRequest) error {
+func (r *scanItemRepo) Update(context.Context, uuid.UUID, model.Item) error {
 	return nil
 }
 
@@ -189,7 +189,7 @@ func (r *scanContainerRepo) Get(context.Context, uuid.UUID) (model.Container, er
 	return r.container, r.containerErr
 }
 
-func (r *scanContainerRepo) Update(context.Context, uuid.UUID, model.UpdateContainerRequest) error {
+func (r *scanContainerRepo) Update(context.Context, uuid.UUID, model.Container) error {
 	return nil
 }
 

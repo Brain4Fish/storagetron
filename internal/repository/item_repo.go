@@ -32,9 +32,13 @@ func (r *ItemRepo) Create(ctx context.Context, item model.Item, labelCode string
 	defer tx.Rollback(ctx)
 
 	_, err = tx.Exec(ctx, `
-		INSERT INTO items (id, name, description, location_id)
-		VALUES ($1, $2, $3, $4)
-	`, item.ID, item.Name, item.Description, item.LocationID)
+		INSERT INTO items (
+			id, name, description, quantity, category, acquisition_year, condition,
+			serial_number, estimated_value, value_currency, source_language, location_id
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`, item.ID, item.Name, item.Description, item.Quantity, item.Category, item.AcquisitionYear,
+		item.Condition, item.SerialNumber, item.EstimatedValue, item.ValueCurrency, item.SourceLanguage, item.LocationID)
 	if err != nil {
 		return err
 	}
@@ -55,7 +59,9 @@ func (r *ItemRepo) Create(ctx context.Context, item model.Item, labelCode string
 func (r *ItemRepo) List(ctx context.Context) ([]model.Item, error) {
 	rows, err := r.db.Query(ctx, `
         SELECT
-            i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at,
+            i.id, i.name, COALESCE(i.description, ''), i.quantity, i.category, i.acquisition_year,
+            i.condition, i.serial_number, i.estimated_value, i.value_currency, i.source_language,
+            i.location_id, i.created_at,
             l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at,
             il.id, COALESCE(il.name, ''), COALESCE(il.country, ''), COALESCE(il.city, ''), COALESCE(il.room, ''), COALESCE(il.shelf, ''), il.created_at
         FROM items i
@@ -90,7 +96,9 @@ func (r *ItemRepo) List(ctx context.Context) ([]model.Item, error) {
 func (r *ItemRepo) ListPage(ctx context.Context, limit, offset int) ([]model.Item, int, error) {
 	rows, err := r.db.Query(ctx, `
         SELECT
-            i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at,
+            i.id, i.name, COALESCE(i.description, ''), i.quantity, i.category, i.acquisition_year,
+            i.condition, i.serial_number, i.estimated_value, i.value_currency, i.source_language,
+            i.location_id, i.created_at,
             l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at,
             il.id, COALESCE(il.name, ''), COALESCE(il.country, ''), COALESCE(il.city, ''), COALESCE(il.room, ''), COALESCE(il.shelf, ''), il.created_at
         FROM items i
@@ -133,7 +141,9 @@ func (r *ItemRepo) Get(ctx context.Context, id uuid.UUID) (model.Item, error) {
 	var i model.Item
 	err := scanItemWithLocations(r.db.QueryRow(ctx, `
 		SELECT
-			i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at,
+			i.id, i.name, COALESCE(i.description, ''), i.quantity, i.category, i.acquisition_year,
+			i.condition, i.serial_number, i.estimated_value, i.value_currency, i.source_language,
+			i.location_id, i.created_at,
 			l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at,
 			il.id, COALESCE(il.name, ''), COALESCE(il.country, ''), COALESCE(il.city, ''), COALESCE(il.room, ''), COALESCE(il.shelf, ''), il.created_at
 		FROM items i
@@ -153,12 +163,23 @@ func (r *ItemRepo) Get(ctx context.Context, id uuid.UUID) (model.Item, error) {
 	return i, err
 }
 
-func (r *ItemRepo) Update(ctx context.Context, id uuid.UUID, req model.UpdateItemRequest) error {
+func (r *ItemRepo) Update(ctx context.Context, id uuid.UUID, item model.Item) error {
 	cmd, err := r.db.Exec(ctx, `
 		UPDATE items
-		SET name = $2, description = $3, location_id = $4
+		SET name = $2,
+			description = $3,
+			quantity = $4,
+			category = $5,
+			acquisition_year = $6,
+			condition = $7,
+			serial_number = $8,
+			estimated_value = $9,
+			value_currency = $10,
+			source_language = $11,
+			location_id = $12
 		WHERE id = $1
-	`, id, req.Name, req.Description, req.LocationID)
+	`, id, item.Name, item.Description, item.Quantity, item.Category, item.AcquisitionYear,
+		item.Condition, item.SerialNumber, item.EstimatedValue, item.ValueCurrency, item.SourceLanguage, item.LocationID)
 	if err != nil {
 		return err
 	}
@@ -273,7 +294,9 @@ func scanItemWithLocations(row scanner, item *model.Item) error {
 	var locationCreatedAt *time.Time
 	var inheritedLocationCreatedAt *time.Time
 	if err := row.Scan(
-		&item.ID, &item.Name, &item.Description, &item.LocationID, &item.CreatedAt,
+		&item.ID, &item.Name, &item.Description, &item.Quantity, &item.Category, &item.AcquisitionYear,
+		&item.Condition, &item.SerialNumber, &item.EstimatedValue, &item.ValueCurrency, &item.SourceLanguage,
+		&item.LocationID, &item.CreatedAt,
 		&locationID, &location.Name, &location.Country, &location.City, &location.Room, &location.Shelf, &locationCreatedAt,
 		&inheritedLocationID, &inheritedLocation.Name, &inheritedLocation.Country, &inheritedLocation.City, &inheritedLocation.Room, &inheritedLocation.Shelf, &inheritedLocationCreatedAt,
 	); err != nil {

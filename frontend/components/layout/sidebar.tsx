@@ -7,6 +7,7 @@ import {
     Archive,
     Box,
     ChevronDown,
+    FileText,
     Home,
     MapPin,
     Package,
@@ -26,6 +27,7 @@ const navItems = [
     { href: "/locations", label: "Locations", icon: MapPin },
     { href: "/labels", label: "Labels", icon: Tags },
     { href: "/scan", label: "Scan", icon: QrCode },
+    { href: "/documentation", label: "Documentation", icon: FileText },
 ];
 
 const systemItems = [

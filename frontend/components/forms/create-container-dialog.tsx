@@ -17,6 +17,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { LocationSelect } from "@/components/forms/location-select";
 import { LabelPicker } from "@/components/labels/label-picker";
+import {
+    ContainerDocumentDraft,
+    ContainerDocumentFields,
+    containerDocumentPayload,
+    initialContainerDocumentDraft,
+    validateContainerDocumentDraft,
+} from "@/components/forms/document-fields";
 
 type Props = {
     open: boolean;
@@ -28,6 +35,7 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [locationId, setLocationId] = useState("");
+    const [documentData, setDocumentData] = useState<ContainerDocumentDraft>(initialContainerDocumentDraft);
     const [error, setError] = useState("");
     const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
     const [createdContainerId, setCreatedContainerId] = useState("");
@@ -42,7 +50,12 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
         mutationFn: async () => {
             let containerId = createdContainerId;
             if (!containerId) {
-                const container = await api.createContainer({ name, description, location_id: locationId || null });
+                const container = await api.createContainer({
+                    name,
+                    description,
+                    location_id: locationId || null,
+                    ...containerDocumentPayload(documentData),
+                });
                 containerId = container.id;
                 setCreatedContainerId(container.id);
             }
@@ -66,6 +79,7 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
             setName("");
             setDescription("");
             setLocationId("");
+            setDocumentData(initialContainerDocumentDraft());
             setSelectedLabelIds([]);
             setCreatedContainerId("");
             setAttachedLabelIds([]);
@@ -83,6 +97,11 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
 
         if (!name.trim()) {
             setError("Name is required");
+            return;
+        }
+        const documentError = validateContainerDocumentDraft(documentData);
+        if (documentError) {
+            setError(documentError);
             return;
         }
 
@@ -123,6 +142,12 @@ export function CreateContainerDialog({ open, onOpenChange }: Props) {
                         locations={locations}
                         value={locationId}
                         onChange={setLocationId}
+                    />
+
+                    <ContainerDocumentFields
+                        value={documentData}
+                        onChange={setDocumentData}
+                        idPrefix="new-container-document"
                     />
 
                     <div className="space-y-2">

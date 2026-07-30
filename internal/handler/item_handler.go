@@ -49,6 +49,10 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.Create(ctx, req)
 	if err != nil {
+		if service.IsValidationError(err) {
+			respondErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		h.logger.Error("create item failed", zap.Error(err))
 		respondErr(w, http.StatusInternalServerError, "failed to create item")
 		return
@@ -160,6 +164,10 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			respondErr(w, http.StatusNotFound, "item not found")
+			return
+		}
+		if service.IsValidationError(err) {
+			respondErr(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		h.logger.Error("update item failed", zap.Error(err), zap.String("item_id", id.String()))

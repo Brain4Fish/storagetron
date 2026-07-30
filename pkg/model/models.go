@@ -1,6 +1,8 @@
 package model
 
 import (
+	"bytes"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,6 +12,14 @@ type Item struct {
 	ID                uuid.UUID  `json:"id"`
 	Name              string     `json:"name"`
 	Description       string     `json:"description,omitempty"`
+	Quantity          int        `json:"quantity"`
+	Category          string     `json:"category"`
+	AcquisitionYear   *int16     `json:"acquisition_year"`
+	Condition         string     `json:"condition"`
+	SerialNumber      string     `json:"serial_number"`
+	EstimatedValue    *float64   `json:"estimated_value"`
+	ValueCurrency     *string    `json:"value_currency"`
+	SourceLanguage    string     `json:"source_language"`
 	LocationID        *uuid.UUID `json:"location_id,omitempty"`
 	Location          *Location  `json:"location,omitempty"`
 	InheritedLocation *Location  `json:"inherited_location,omitempty"`
@@ -29,6 +39,12 @@ type Container struct {
 	ID              uuid.UUID  `json:"id"`
 	Name            string     `json:"name"`
 	Description     string     `json:"description,omitempty"`
+	PackageCode     string     `json:"package_code"`
+	GrossWeightKg   *float64   `json:"gross_weight_kg"`
+	VolumeM3        *float64   `json:"volume_m3"`
+	EstimatedValue  *float64   `json:"estimated_value"`
+	ValueCurrency   *string    `json:"value_currency"`
+	SourceLanguage  string     `json:"source_language"`
 	LocationID      *uuid.UUID `json:"location_id,omitempty"`
 	Location        *Location  `json:"location,omitempty"`
 	CreatedAt       time.Time  `json:"created_at,omitempty"`
@@ -103,30 +119,76 @@ type AddItemToContainerRequest struct {
 	ItemID uuid.UUID `json:"item_id"`
 }
 
+// Optional distinguishes an omitted JSON field from an explicit null value.
+// Value is nil for JSON null and Set is false when the field was not present.
+type Optional[T any] struct {
+	Set   bool
+	Value *T
+}
+
+func (o *Optional[T]) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		o.Value = nil
+		return nil
+	}
+
+	var value T
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	o.Value = &value
+	return nil
+}
+
 type CreateContainerRequest struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	LocationID  *uuid.UUID `json:"location_id"`
-	LabelCode   string     `json:"label_code"`
+	Name           string     `json:"name"`
+	Description    string     `json:"description"`
+	LocationID     *uuid.UUID `json:"location_id"`
+	LabelCode      string     `json:"label_code"`
+	PackageCode    string     `json:"package_code"`
+	GrossWeightKg  *float64   `json:"gross_weight_kg"`
+	VolumeM3       *float64   `json:"volume_m3"`
+	EstimatedValue *float64   `json:"estimated_value"`
+	ValueCurrency  *string    `json:"value_currency"`
 }
 
 type UpdateContainerRequest struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	LocationID  *uuid.UUID `json:"location_id"`
+	Name           string            `json:"name"`
+	Description    string            `json:"description"`
+	LocationID     *uuid.UUID        `json:"location_id"`
+	PackageCode    Optional[string]  `json:"package_code"`
+	GrossWeightKg  Optional[float64] `json:"gross_weight_kg"`
+	VolumeM3       Optional[float64] `json:"volume_m3"`
+	EstimatedValue Optional[float64] `json:"estimated_value"`
+	ValueCurrency  Optional[string]  `json:"value_currency"`
 }
 
 type CreateItemRequest struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	LocationID  *uuid.UUID `json:"location_id"`
-	LabelCode   string     `json:"label_code"`
+	Name            string     `json:"name"`
+	Description     string     `json:"description"`
+	LocationID      *uuid.UUID `json:"location_id"`
+	LabelCode       string     `json:"label_code"`
+	Quantity        *int       `json:"quantity"`
+	Category        string     `json:"category"`
+	AcquisitionYear *int16     `json:"acquisition_year"`
+	Condition       *string    `json:"condition"`
+	SerialNumber    string     `json:"serial_number"`
+	EstimatedValue  *float64   `json:"estimated_value"`
+	ValueCurrency   *string    `json:"value_currency"`
 }
 
 type UpdateItemRequest struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	LocationID  *uuid.UUID `json:"location_id"`
+	Name            string            `json:"name"`
+	Description     string            `json:"description"`
+	LocationID      *uuid.UUID        `json:"location_id"`
+	Quantity        Optional[int]     `json:"quantity"`
+	Category        Optional[string]  `json:"category"`
+	AcquisitionYear Optional[int16]   `json:"acquisition_year"`
+	Condition       Optional[string]  `json:"condition"`
+	SerialNumber    Optional[string]  `json:"serial_number"`
+	EstimatedValue  Optional[float64] `json:"estimated_value"`
+	ValueCurrency   Optional[string]  `json:"value_currency"`
 }
 
 type CreatePhotoRequest struct {

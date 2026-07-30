@@ -81,7 +81,10 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                     </div>
                                 </div>
                                 <div className="mt-3 flex items-center justify-between gap-2">
-                                    <span className={statusClass(row.status)}>{itemStatusLabel(row.status)}</span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <span className={statusClass(row.status)}>{itemStatusLabel(row.status)}</span>
+                                        <span className="status-pill bg-zinc-100 text-zinc-700">Количество: {row.item.quantity ?? 1}</span>
+                                    </div>
                                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <input
                                             type="checkbox"
@@ -117,6 +120,7 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                     />
                                 </th>
                                 <th className="px-4 py-3 text-left">Item</th>
+                                <th className="px-4 py-3 text-left">Количество</th>
                                 <th className="px-4 py-3 text-left">Location</th>
                                 <th className="px-4 py-3 text-left">Container</th>
                                 <th className="px-4 py-3 text-left">Labels</th>
@@ -161,6 +165,7 @@ export function ItemsTable({ rows, selectedItemIds, onToggleItem, onToggleItems,
                                             </div>
                                         </div>
                                     </td>
+                                    <td className="whitespace-nowrap px-4 py-3">{row.item.quantity ?? 1}</td>
                                     <td className="whitespace-nowrap px-4 py-3 text-zinc-700">{row.locationLabel}</td>
                                     <td className="whitespace-nowrap px-4 py-3">
                                         {row.container ? (

@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -30,6 +31,43 @@ func TestItemHandlerCreateRejectsMissingName(t *testing.T) {
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.Contains(t, rec.Body.String(), "name is required")
+}
+
+func TestItemHandlerCreateLegacyRequestUsesDocumentDefaults(t *testing.T) {
+	repo := &inventoryItemRepo{}
+	handler := NewItemHandler(newInventoryItemService(repo), zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	handler.Create(rec, httptest.NewRequest(http.MethodPost, "/items", bytes.NewBufferString(`{"name":"Camera"}`)))
+
+	require.Equal(t, http.StatusCreated, rec.Code)
+	require.Equal(t, 1, repo.created.Quantity)
+	require.Equal(t, "used", repo.created.Condition)
+	require.Equal(t, "ru", repo.created.SourceLanguage)
+
+	var response model.Item
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	require.Equal(t, 1, response.Quantity)
+	require.Equal(t, "used", response.Condition)
+	require.Equal(t, "ru", response.SourceLanguage)
+}
+
+func TestItemHandlerCreateRejectsInvalidDocumentFields(t *testing.T) {
+	handler := NewItemHandler(newInventoryItemService(&inventoryItemRepo{}), zap.NewNop())
+	tests := []string{
+		`{"name":"Camera","quantity":0}`,
+		`{"name":"Camera","estimated_value":-1,"value_currency":"RUB"}`,
+		`{"name":"Camera","estimated_value":100}`,
+		`{"name":"Camera","value_currency":"RUB"}`,
+		`{"name":"Camera","condition":"damaged"}`,
+		`{"name":"Camera","estimated_value":100,"value_currency":"RU"}`,
+	}
+
+	for _, body := range tests {
+		rec := httptest.NewRecorder()
+		handler.Create(rec, httptest.NewRequest(http.MethodPost, "/items", bytes.NewBufferString(body)))
+		require.Equal(t, http.StatusBadRequest, rec.Code, body)
+	}
 }
 
 func TestItemHandlerListRejectsInvalidPagination(t *testing.T) {
@@ -77,6 +115,59 @@ func TestItemHandlerGetMapsNotFound(t *testing.T) {
 
 	require.Equal(t, http.StatusNotFound, rec.Code)
 	require.Contains(t, rec.Body.String(), "item not found")
+}
+
+func TestItemHandlerUpdatePreservesOmittedAndClearsExplicitNullFields(t *testing.T) {
+	itemID := uuid.New()
+	year := int16(2020)
+	value := 120.5
+	currency := "RUB"
+	repo := &inventoryItemRepo{item: model.Item{
+		ID:              itemID,
+		Name:            "Camera",
+		Quantity:        2,
+		Category:        "Electronics",
+		AcquisitionYear: &year,
+		Condition:       "used",
+		EstimatedValue:  &value,
+		ValueCurrency:   &currency,
+		SourceLanguage:  "ru",
+	}}
+	handler := NewItemHandler(newInventoryItemService(repo), zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	handler.Update(rec, inventoryRequestWithParams(
+		http.MethodPatch,
+		"/items/"+itemID.String(),
+		`{"name":"Camera updated","description":"","location_id":null}`,
+		map[string]string{"id": itemID.String()},
+	))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, 2, repo.updated.Quantity)
+	require.Equal(t, &year, repo.updated.AcquisitionYear)
+	require.Equal(t, &value, repo.updated.EstimatedValue)
+
+	rec = httptest.NewRecorder()
+	handler.Update(rec, inventoryRequestWithParams(
+		http.MethodPatch,
+		"/items/"+itemID.String(),
+		`{"name":"Camera updated","description":"","location_id":null,"acquisition_year":null,"estimated_value":null,"value_currency":null}`,
+		map[string]string{"id": itemID.String()},
+	))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Nil(t, repo.updated.AcquisitionYear)
+	require.Nil(t, repo.updated.EstimatedValue)
+	require.Nil(t, repo.updated.ValueCurrency)
+
+	rec = httptest.NewRecorder()
+	handler.Update(rec, inventoryRequestWithParams(
+		http.MethodPatch,
+		"/items/"+itemID.String(),
+		`{"name":"Camera updated","quantity":null}`,
+		map[string]string{"id": itemID.String()},
+	))
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "quantity cannot be null")
 }
 
 func TestItemHandlerDeleteReturnsNoContent(t *testing.T) {
@@ -128,6 +219,55 @@ func TestContainerHandlerAddItemMapsAlreadyAssignedToConflict(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "item is already assigned to a kit")
 	require.Equal(t, containerID, repo.addContainerID)
 	require.Equal(t, itemID, repo.addItemID)
+}
+
+func TestContainerHandlerCreateRejectsInvalidDocumentFields(t *testing.T) {
+	handler := NewContainerHandler(service.NewContainerService(&inventoryContainerRepo{}, nil), zap.NewNop())
+	tests := []string{
+		`{"name":"Box","gross_weight_kg":-1}`,
+		`{"name":"Box","volume_m3":-1}`,
+		`{"name":"Box","estimated_value":-1,"value_currency":"RUB"}`,
+		`{"name":"Box","estimated_value":100}`,
+		`{"name":"Box","value_currency":"RUB"}`,
+	}
+
+	for _, body := range tests {
+		rec := httptest.NewRecorder()
+		handler.Create(rec, httptest.NewRequest(http.MethodPost, "/containers", bytes.NewBufferString(body)))
+		require.Equal(t, http.StatusBadRequest, rec.Code, body)
+	}
+}
+
+func TestContainerHandlerCreateLegacyRequestUsesDocumentDefaults(t *testing.T) {
+	repo := &inventoryContainerRepo{}
+	handler := NewContainerHandler(service.NewContainerService(repo, nil), zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	handler.Create(rec, httptest.NewRequest(http.MethodPost, "/containers", bytes.NewBufferString(`{"name":"Box"}`)))
+
+	require.Equal(t, http.StatusCreated, rec.Code)
+	require.Equal(t, "", repo.created.PackageCode)
+	require.Nil(t, repo.created.GrossWeightKg)
+	require.Nil(t, repo.created.VolumeM3)
+	require.Nil(t, repo.created.EstimatedValue)
+	require.Nil(t, repo.created.ValueCurrency)
+	require.Equal(t, "ru", repo.created.SourceLanguage)
+}
+
+func TestContainerHandlerCreateMapsPackageCodeConflict(t *testing.T) {
+	repo := &inventoryContainerRepo{createErr: &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: "idx_containers_package_code_ci",
+	}}
+	handler := NewContainerHandler(service.NewContainerService(repo, nil), zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	handler.Create(rec, httptest.NewRequest(http.MethodPost, "/containers", bytes.NewBufferString(
+		`{"name":"Box","package_code":"bx-001"}`,
+	)))
+
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Contains(t, rec.Body.String(), "package_code already exists")
 }
 
 func TestContainerHandlerRemoveItemMapsMissingRelationToNotFound(t *testing.T) {
@@ -405,14 +545,20 @@ type inventoryItemRepo struct {
 	pageLimit  int
 	pageOffset int
 
-	item   model.Item
-	getErr error
+	item    model.Item
+	getErr  error
+	created model.Item
+	updated model.Item
 
 	deletedID uuid.UUID
 	deleteErr error
 }
 
-func (r *inventoryItemRepo) Create(context.Context, model.Item, string) error {
+func (r *inventoryItemRepo) Create(_ context.Context, item model.Item, _ string) error {
+	r.created = item
+	if r.item.ID == uuid.Nil {
+		r.item = item
+	}
 	return nil
 }
 
@@ -433,7 +579,9 @@ func (r *inventoryItemRepo) Get(context.Context, uuid.UUID) (model.Item, error) 
 	return r.item, nil
 }
 
-func (r *inventoryItemRepo) Update(context.Context, uuid.UUID, model.UpdateItemRequest) error {
+func (r *inventoryItemRepo) Update(_ context.Context, _ uuid.UUID, item model.Item) error {
+	r.updated = item
+	r.item = item
 	return nil
 }
 
@@ -462,10 +610,18 @@ type inventoryContainerRepo struct {
 	deleteErr error
 
 	removeErr error
+	container model.Container
+	created   model.Container
+	updated   model.Container
+	createErr error
 }
 
-func (r *inventoryContainerRepo) Create(context.Context, model.Container, string) error {
-	return nil
+func (r *inventoryContainerRepo) Create(_ context.Context, container model.Container, _ string) error {
+	r.created = container
+	if r.container.ID == uuid.Nil {
+		r.container = container
+	}
+	return r.createErr
 }
 
 func (r *inventoryContainerRepo) List(context.Context) ([]model.Container, error) {
@@ -473,10 +629,12 @@ func (r *inventoryContainerRepo) List(context.Context) ([]model.Container, error
 }
 
 func (r *inventoryContainerRepo) Get(context.Context, uuid.UUID) (model.Container, error) {
-	return model.Container{}, nil
+	return r.container, nil
 }
 
-func (r *inventoryContainerRepo) Update(context.Context, uuid.UUID, model.UpdateContainerRequest) error {
+func (r *inventoryContainerRepo) Update(_ context.Context, _ uuid.UUID, container model.Container) error {
+	r.updated = container
+	r.container = container
 	return nil
 }
 

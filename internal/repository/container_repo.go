@@ -28,9 +28,13 @@ func (r *ContainerRepo) Create(ctx context.Context, c model.Container, labelCode
 	defer tx.Rollback(ctx)
 
 	_, err = tx.Exec(ctx, `
-		INSERT INTO containers (id, name, description, location_id)
-		VALUES ($1, $2, $3, $4)
-	`, c.ID, c.Name, c.Description, c.LocationID)
+		INSERT INTO containers (
+			id, name, description, package_code, gross_weight_kg, volume_m3,
+			estimated_value, value_currency, source_language, location_id
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, c.ID, c.Name, c.Description, c.PackageCode, c.GrossWeightKg, c.VolumeM3,
+		c.EstimatedValue, c.ValueCurrency, c.SourceLanguage, c.LocationID)
 	if err != nil {
 		return err
 	}
@@ -51,7 +55,9 @@ func (r *ContainerRepo) Create(ctx context.Context, c model.Container, labelCode
 func (r *ContainerRepo) List(ctx context.Context) ([]model.Container, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			c.id, c.name, COALESCE(c.description, ''), c.location_id, c.created_at, COUNT(ic.item_id),
+			c.id, c.name, COALESCE(c.description, ''), c.package_code, c.gross_weight_kg,
+			c.volume_m3, c.estimated_value, c.value_currency, c.source_language,
+			c.location_id, c.created_at, COUNT(ic.item_id),
 			l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at
 		FROM containers c
 		LEFT JOIN item_container ic ON ic.container_id = c.id
@@ -90,7 +96,9 @@ func (r *ContainerRepo) Get(ctx context.Context, id uuid.UUID) (model.Container,
 	var c model.Container
 	err := scanContainerWithLocation(r.db.QueryRow(ctx, `
 		SELECT
-			c.id, c.name, COALESCE(c.description, ''), c.location_id, c.created_at, 0,
+			c.id, c.name, COALESCE(c.description, ''), c.package_code, c.gross_weight_kg,
+			c.volume_m3, c.estimated_value, c.value_currency, c.source_language,
+			c.location_id, c.created_at, 0,
 			l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at
 		FROM containers c
 		LEFT JOIN locations l ON l.id = c.location_id
@@ -131,12 +139,21 @@ func (r *ContainerRepo) Get(ctx context.Context, id uuid.UUID) (model.Container,
 	return c, nil
 }
 
-func (r *ContainerRepo) Update(ctx context.Context, id uuid.UUID, req model.UpdateContainerRequest) error {
+func (r *ContainerRepo) Update(ctx context.Context, id uuid.UUID, container model.Container) error {
 	cmd, err := r.db.Exec(ctx, `
 		UPDATE containers
-		SET name = $2, description = $3, location_id = $4
+		SET name = $2,
+			description = $3,
+			package_code = $4,
+			gross_weight_kg = $5,
+			volume_m3 = $6,
+			estimated_value = $7,
+			value_currency = $8,
+			source_language = $9,
+			location_id = $10
 		WHERE id = $1
-	`, id, req.Name, req.Description, req.LocationID)
+	`, id, container.Name, container.Description, container.PackageCode, container.GrossWeightKg,
+		container.VolumeM3, container.EstimatedValue, container.ValueCurrency, container.SourceLanguage, container.LocationID)
 	if err != nil {
 		return err
 	}
@@ -312,7 +329,9 @@ func (r *ContainerRepo) hydrateLabels(ctx context.Context, containers []model.Co
 func (r *ContainerRepo) getContainerItems(ctx context.Context, containerID uuid.UUID) ([]model.Item, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			i.id, i.name, COALESCE(i.description, ''), i.location_id, i.created_at,
+			i.id, i.name, COALESCE(i.description, ''), i.quantity, i.category, i.acquisition_year,
+			i.condition, i.serial_number, i.estimated_value, i.value_currency, i.source_language,
+			i.location_id, i.created_at,
 			l.id, COALESCE(l.name, ''), COALESCE(l.country, ''), COALESCE(l.city, ''), COALESCE(l.room, ''), COALESCE(l.shelf, ''), l.created_at,
 			cl.id, COALESCE(cl.name, ''), COALESCE(cl.country, ''), COALESCE(cl.city, ''), COALESCE(cl.room, ''), COALESCE(cl.shelf, ''), cl.created_at
 		FROM items i
@@ -344,7 +363,9 @@ func scanContainerWithLocation(row scanner, container *model.Container) error {
 	var locationID *uuid.UUID
 	var locationCreatedAt *time.Time
 	if err := row.Scan(
-		&container.ID, &container.Name, &container.Description, &container.LocationID, &container.CreatedAt, &container.ItemsCount,
+		&container.ID, &container.Name, &container.Description, &container.PackageCode, &container.GrossWeightKg,
+		&container.VolumeM3, &container.EstimatedValue, &container.ValueCurrency, &container.SourceLanguage,
+		&container.LocationID, &container.CreatedAt, &container.ItemsCount,
 		&locationID, &location.Name, &location.Country, &location.City, &location.Room, &location.Shelf, &locationCreatedAt,
 	); err != nil {
 		return err

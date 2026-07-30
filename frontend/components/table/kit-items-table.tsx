@@ -101,6 +101,9 @@ export function KitItemsTable({
                                 <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{item.description}</p>
                             ) : null}
                             <div className="mt-2 flex flex-wrap gap-1.5">
+                                <span className="status-pill bg-indigo-50 text-primary">
+                                    Количество: {item.quantity ?? 1}
+                                </span>
                                 {formatLocation(effectiveItemLocation(item)) ? (
                                     <span className="status-pill bg-zinc-100 text-zinc-700">
                                         {formatLocation(effectiveItemLocation(item))}
@@ -137,6 +140,7 @@ export function KitItemsTable({
                             />
                         </th>
                         <th className="p-3 text-left">Item</th>
+                        <th className="p-3 text-left">Количество</th>
                         <th className="p-3 text-left">Location</th>
                         <th className="p-3 text-left">Created</th>
                         <th className="w-12 p-3 text-right"></th>
@@ -154,6 +158,7 @@ export function KitItemsTable({
                                     className="h-4 w-4 rounded border-gray-300 accent-primary"
                                 />
                             </td>
+                            <td className="p-3">{item.quantity ?? 1}</td>
                             <td className="p-3">
                                 <div className="flex items-center gap-3">
                                     <div className="h-12 w-12 overflow-hidden rounded-lg bg-gray-200">

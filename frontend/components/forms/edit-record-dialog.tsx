@@ -13,9 +13,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { InventoryLabel, Location } from "@/lib/api";
+import {
+    Container,
+    InventoryLabel,
+    Item,
+    Location,
+    UpdateContainerRequest,
+    UpdateItemRequest,
+} from "@/lib/api";
 import { LocationSelect } from "@/components/forms/location-select";
 import { LabelPicker } from "@/components/labels/label-picker";
+import {
+    ContainerDocumentDraft,
+    ContainerDocumentFields,
+    containerDocumentPayload,
+    initialContainerDocumentDraft,
+    initialItemDocumentDraft,
+    ItemDocumentDraft,
+    ItemDocumentFields,
+    itemDocumentPayload,
+    validateContainerDocumentDraft,
+    validateItemDocumentDraft,
+} from "@/components/forms/document-fields";
+
+type DocumentRecord =
+    | { kind: "item"; value: Item }
+    | { kind: "container"; value: Container };
+
+type EditRecordPayload = UpdateItemRequest & UpdateContainerRequest & { label_ids?: string[] };
+const EMPTY_LABEL_IDS: string[] = [];
 
 type Props = {
     open: boolean;
@@ -27,10 +53,11 @@ type Props = {
     locations?: Location[];
     labels?: InventoryLabel[];
     selectedLabelIds?: string[];
+    documentRecord?: DocumentRecord;
     isSaving?: boolean;
     error?: string;
     onOpenChange: (open: boolean) => void;
-    onSave: (data: { name: string; description: string; location_id?: string | null; label_ids?: string[] }) => void;
+    onSave: (data: EditRecordPayload) => void;
 };
 
 export function EditRecordDialog({
@@ -42,7 +69,8 @@ export function EditRecordDialog({
     locationId = "",
     locations,
     labels,
-    selectedLabelIds = [],
+    selectedLabelIds = EMPTY_LABEL_IDS,
+    documentRecord,
     isSaving,
     error,
     onOpenChange,
@@ -53,6 +81,8 @@ export function EditRecordDialog({
     const [draftLocationId, setDraftLocationId] = useState(locationId);
     const [localError, setLocalError] = useState("");
     const [draftLabelIds, setDraftLabelIds] = useState(selectedLabelIds);
+    const [itemDocumentData, setItemDocumentData] = useState<ItemDocumentDraft>(initialItemDocumentDraft);
+    const [containerDocumentData, setContainerDocumentData] = useState<ContainerDocumentDraft>(initialContainerDocumentDraft);
 
     useEffect(() => {
         if (open) {
@@ -61,8 +91,14 @@ export function EditRecordDialog({
             setDraftLocationId(locationId);
             setLocalError("");
             setDraftLabelIds(selectedLabelIds);
+            if (documentRecord?.kind === "item") {
+                setItemDocumentData(initialItemDocumentDraft(documentRecord.value));
+            }
+            if (documentRecord?.kind === "container") {
+                setContainerDocumentData(initialContainerDocumentDraft(documentRecord.value));
+            }
         }
-    }, [details, locationId, name, open, selectedLabelIds]);
+    }, [details, documentRecord, locationId, name, open, selectedLabelIds]);
 
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -72,11 +108,22 @@ export function EditRecordDialog({
             setLocalError("Name is required");
             return;
         }
+        const documentError = documentRecord?.kind === "item"
+            ? validateItemDocumentDraft(itemDocumentData)
+            : documentRecord?.kind === "container"
+                ? validateContainerDocumentDraft(containerDocumentData)
+                : "";
+        if (documentError) {
+            setLocalError(documentError);
+            return;
+        }
 
         onSave({
             name: draftName.trim(),
             description: draftDescription.trim(),
             ...(locations ? { location_id: draftLocationId || null } : {}),
+            ...(documentRecord?.kind === "item" ? itemDocumentPayload(itemDocumentData) : {}),
+            ...(documentRecord?.kind === "container" ? containerDocumentPayload(containerDocumentData) : {}),
             ...(labels ? { label_ids: draftLabelIds } : {}),
         });
     };
@@ -114,6 +161,22 @@ export function EditRecordDialog({
                             locations={locations}
                             value={draftLocationId}
                             onChange={setDraftLocationId}
+                        />
+                    ) : null}
+
+                    {documentRecord?.kind === "item" ? (
+                        <ItemDocumentFields
+                            value={itemDocumentData}
+                            onChange={setItemDocumentData}
+                            idPrefix="edit-item-document"
+                        />
+                    ) : null}
+
+                    {documentRecord?.kind === "container" ? (
+                        <ContainerDocumentFields
+                            value={containerDocumentData}
+                            onChange={setContainerDocumentData}
+                            idPrefix="edit-container-document"
                         />
                     ) : null}
 

@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Box, Download, Edit3, MapPin, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, photoContentUrl } from "@/lib/api";
+import { api, ApiError, photoContentUrl, UpdateContainerRequest } from "@/lib/api";
 import { downloadInventoryRowsXlsx, downloadSelectedAssetsXlsx, mergeExportLabels } from "@/lib/export-assets";
 import { formatLocation } from "@/lib/location";
 import { PageShell } from "@/components/page-shell";
@@ -21,6 +21,7 @@ import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialo
 import { LabelList } from "@/components/labels/label-chip";
 import { labelSelectionDiff } from "@/lib/labels";
 import { AddItemsToContainerDialog } from "@/components/add-items-to-container-dialog";
+import { DocumentDataCard } from "@/components/document-data-card";
 
 export default function KitDetailsPage() {
     const params = useParams();
@@ -77,7 +78,7 @@ export default function KitDetailsPage() {
     const selectedLabelIds = useMemo(() => (containerQuery.data?.labels ?? []).map((label) => label.id), [containerQuery.data?.labels]);
 
     const updateMutation = useMutation({
-        mutationFn: async (payload: { name: string; description: string; location_id?: string | null; label_ids?: string[] }) => {
+        mutationFn: async (payload: UpdateContainerRequest & { label_ids?: string[] }) => {
             const { label_ids = [], ...record } = payload;
             await api.updateContainer(id, record);
             const diff = labelSelectionDiff(containerQuery.data?.labels ?? [], label_ids);
@@ -369,6 +370,8 @@ export default function KitDetailsPage() {
                             </div>
                         </section>
 
+                        <DocumentDataCard kind="container" value={container} />
+
                         <section className="apple-card rounded-2xl p-4">
                             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
@@ -509,6 +512,7 @@ export default function KitDetailsPage() {
                 locations={locations}
                 labels={labels}
                 selectedLabelIds={selectedLabelIds}
+                documentRecord={{ kind: "container", value: container }}
                 isSaving={updateMutation.isPending}
                 error={editError}
                 onOpenChange={setEditOpen}

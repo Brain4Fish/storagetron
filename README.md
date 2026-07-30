@@ -53,6 +53,7 @@ flowchart TD
 - Photo uploads through presigned S3 URLs for item and kit images.
 - Browser UI for scanning, browsing, creating, editing, and printing inventory labels.
 - Export flows for CSV/XLSX label-printing workflows.
+- Russian-language XLSX and print-ready PDF moving inventories for Russia → Kazakhstan.
 - Backup targets, schedules, manual backup runs, restore runs, and retention policy.
 - Prometheus metrics for HTTP traffic, build info, Postgres pool stats, backups, and restores.
 
@@ -103,6 +104,36 @@ The Compose credentials are development defaults. Replace every secret before us
 - Keeping photo evidence of stored objects and containers.
 - Backing up an inventory database and related object storage as one recoverable unit.
 
+## Moving inventory document data
+
+Items and containers can carry optional structured data for preparing a Russian-language moving inventory. The Documentation API uses these source fields to generate XLSX and print-ready PDF reports.
+
+Item fields:
+
+| API field | Meaning |
+| --- | --- |
+| `quantity` | Positive item count. Defaults to `1`. |
+| `category` | Free-form document category. Defaults to an empty string. |
+| `acquisition_year` | Optional acquisition year stored as a PostgreSQL `SMALLINT`. |
+| `condition` | `new` or `used`. Defaults to `used`. |
+| `serial_number` | Optional serial number. Defaults to an empty string. |
+| `estimated_value` | Optional non-negative estimated value with two decimal places. |
+| `value_currency` | Three-letter ISO-style currency code stored in uppercase. Required exactly when `estimated_value` is set. |
+| `source_language` | Source text language. It is currently server-managed and always returned as `ru`. |
+
+Container fields:
+
+| API field | Meaning |
+| --- | --- |
+| `package_code` | Human-friendly package identifier such as `BX-001`. Non-empty values are unique case-insensitively. |
+| `gross_weight_kg` | Optional positive gross weight in kilograms with three decimal places. |
+| `volume_m3` | Optional positive volume in cubic metres with four decimal places. |
+| `estimated_value` | Optional non-negative estimate for the whole package. Documentation reports use it as an override for the sum of contained item values. |
+| `value_currency` | Three-letter ISO-style currency code stored in uppercase. Required exactly when `estimated_value` is set. |
+| `source_language` | Source text language. It is currently server-managed and always returned as `ru`. |
+
+The web forms suggest `RUB`, `KZT`, `EUR`, and `USD`, while the API accepts any three-letter uppercase code. Nullable value and currency fields must be set or cleared together. The source columns are intentionally stable so future translations can live in separate tables without renaming the existing fields.
+
 ## Configuration
 
 The API requires these environment variables:
@@ -117,6 +148,9 @@ The API requires these environment variables:
 | `S3_SECRET_KEY` | S3 secret key. |
 | `BACKUP_SECRET_KEY` | Secret used to encrypt backup target configuration. Keep it stable. |
 | `BACKUP_TEMP_DIR` | Optional temp directory for backup artifacts. |
+| `DOCUMENTATION_REPORTS_DIR` | Writable persistent directory for generated XLSX/PDF reports. Defaults to `./data/reports`. |
+
+The report directory is part of durable application state: metadata lives in Postgres, while the generated file lives in this directory. Docker Compose mounts the named volume `documentation-reports` at `/data/reports`. Other deployment methods must provide an equivalent writable persistent mount; a pod-local or container-local directory will lose downloads after replacement. The built-in Postgres/S3 backup workflow does not currently archive this filesystem directory, so back up the report volume separately when generated files must be retained.
 
 The web app has a runtime same-origin `/api/*` proxy for local development and server-side work such as Next.js image optimization. It defaults to `http://localhost:8086`; override it with an API origin that does not include an `/api` path:
 
@@ -265,6 +299,71 @@ curl http://localhost:8086/scan/ITEM-LAPTOP-001
 curl http://localhost:8086/scan/{item_or_container_uuid}
 ```
 
+### Documentation reports
+
+Generate a Russian XLSX inventory for all containers and loose items at one location:
+
+```bash
+curl -X POST http://localhost:8086/documentation/reports \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": {
+      "type": "location",
+      "location_id": "{location_id}"
+    },
+    "format": "xlsx",
+    "language": "ru",
+    "summary": {
+      "owner_name": "Иван Иванов",
+      "carrier": "Транспортная компания",
+      "transport_order_number": "",
+      "origin_country": "Россия",
+      "origin_address": "Москва",
+      "destination_country": "Казахстан",
+      "destination_address": "Алматы",
+      "shipment_date": "2026-08-01"
+    }
+  }'
+```
+
+For selected packages, use a container scope and choose either `xlsx` or `pdf`:
+
+```json
+{
+  "scope": {
+    "type": "containers",
+    "container_ids": ["{container_id}", "{container_id}"]
+  },
+  "format": "pdf",
+  "language": "ru",
+  "summary": {
+    "owner_name": "Иван Иванов",
+    "carrier": "",
+    "transport_order_number": "ORDER-123",
+    "origin_country": "Россия",
+    "origin_address": "",
+    "destination_country": "Казахстан",
+    "destination_address": "",
+    "shipment_date": "2026-08-01"
+  }
+}
+```
+
+Only exact `language: "ru"` is supported in this version. Location scope includes every container assigned to the location, all items in those containers, and items assigned directly to the location that have no container. Container scope includes only the selected containers and their items. Duplicate container IDs and duplicate item membership do not produce duplicate rows.
+
+Values are never converted between currencies. Summary totals are grouped by currency. A container `estimated_value` replaces the values of its items in the overall totals; otherwise item values are used. If those items use one currency, their sum also appears in the container row. With multiple currencies, that row's value and currency remain blank while every currency is still represented in the summary.
+
+The server assigns the report filename. A blank transport order number produces a labelled, underlined field for handwriting in both formats.
+
+List the latest available files and download one by ID:
+
+```bash
+curl http://localhost:8086/documentation/reports
+curl -OJ http://localhost:8086/documentation/reports/{report_id}/download
+```
+
+The list is limited to the 50 newest metadata records and omits entries whose local file is missing. All three endpoints are also available under `/api`.
+
 Create an SFTP backup target:
 
 ```bash
@@ -304,6 +403,8 @@ A Helm chart is available at [`charts/storagetron`](charts/storagetron/README.md
 
 The chart can create ingress resources, but Storagetron still does not provide built-in authentication or authorization. Keep it behind a trusted network or an external access-control layer before exposing it beyond your private environment.
 
+The current chart is unchanged for Documentation v1. Configure report persistence through the existing `api.env`, `api.extraVolumes`, and `api.extraVolumeMounts` values. Set `DOCUMENTATION_REPORTS_DIR` in `api.env` to the mounted path (for example `/data/reports`) and mount a PersistentVolumeClaim there. Keep `api.replicaCount: 1` unless all API replicas share the same ReadWriteMany volume.
+
 Important note about HPA, right now it's a little bit risky for API, because backup job creates on each API instance and doesn't synchronize with other instances which can cause conflicts. Right now you can count HPA as a WIP feature.
 
 ## Development
@@ -326,6 +427,7 @@ export S3_BUCKET="inventory"
 export S3_ACCESS_KEY="minio"
 export S3_SECRET_KEY="minio123"
 export BACKUP_SECRET_KEY="development-backup-secret-change-me"
+export DOCUMENTATION_REPORTS_DIR="./data/reports"
 
 go run ./cmd/api
 ```
@@ -366,6 +468,7 @@ internal/service         Business logic
 internal/repository      Postgres repositories
 internal/storage         S3/MinIO client
 internal/backup          Backup scheduler, worker, storage, and target drivers
+internal/documentation   Scope snapshots, report storage, calculations, XLSX/PDF renderers
 internal/metrics         Prometheus instrumentation
 internal/config          Environment-based API configuration
 migrations               Forward-only database schema migrations
