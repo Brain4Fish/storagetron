@@ -339,6 +339,7 @@ func applyRepositoryMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 func truncateRepositoryTables(ctx context.Context, pool *pgxpool.Pool) error {
 	_, err := pool.Exec(ctx, `
 		TRUNCATE
+			documentation_reports,
 			restore_runs,
 			backup_runs,
 			backup_schedules,

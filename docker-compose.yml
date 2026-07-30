@@ -56,6 +56,9 @@ services:
       S3_ACCESS_KEY: minio
       S3_SECRET_KEY: minio123
       BACKUP_SECRET_KEY: development-backup-secret-change-me
+      DOCUMENTATION_REPORTS_DIR: /data/reports
+    volumes:
+      - documentation-reports:/data/reports
     ports:
       - "8086:8080"
     profiles:
@@ -91,3 +94,6 @@ services:
       - "9090:9090"
     profiles:
       - metrics
+
+volumes:
+  documentation-reports:

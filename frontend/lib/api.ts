@@ -153,6 +153,53 @@ export type VersionInfo = {
     date: string;
 };
 
+export type DocumentationScopeType = "location" | "containers";
+export type DocumentationReportFormat = "xlsx" | "pdf";
+export type DocumentationLanguage = "ru";
+
+export type DocumentationSummary = {
+    owner_name: string;
+    carrier: string;
+    transport_order_number: string;
+    origin_country: string;
+    origin_address: string;
+    destination_country: string;
+    destination_address: string;
+    shipment_date: string;
+};
+
+export type CreateDocumentationReportRequest = {
+    scope:
+        | { type: "location"; location_id: string }
+        | { type: "containers"; container_ids: string[] };
+    format: DocumentationReportFormat;
+    language: DocumentationLanguage;
+    summary: DocumentationSummary;
+};
+
+export type DocumentationReport = {
+    id: string;
+    filename: string;
+    format: DocumentationReportFormat;
+    language: DocumentationLanguage;
+    scope_type: DocumentationScopeType;
+    scope_summary: {
+        location_name?: string;
+        containers_count: number;
+    };
+    transport_order_number: string;
+    content_type: string;
+    size_bytes: number;
+    created_at: string;
+    download_url: string;
+};
+
+export type DocumentationReportDownload = {
+    blob: Blob;
+    filename: string;
+    contentType: string;
+};
+
 export type BackupTargetType = "sftp" | "local" | "s3" | "webdav";
 export type BackupJobStatus = "pending" | "running" | "completed" | "failed";
 
@@ -270,13 +317,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         });
 
         if (!res.ok) {
-            let msg = "Request failed";
-            try {
-                const json = await res.json();
-                if (json?.error) msg = json.error;
-            } catch {}
-
-            throw new ApiError(res.status, msg);
+            throw new ApiError(res.status, await responseErrorMessage(res));
         }
 
         if (res.status === 204) return undefined as T;
@@ -287,6 +328,72 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
             throw new ApiError(0, "Request timeout");
         }
         throw e;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function responseErrorMessage(response: Response) {
+    try {
+        const json = await response.json();
+        if (typeof json?.error === "string" && json.error) return json.error;
+    } catch {}
+    return "Request failed";
+}
+
+function safeDownloadFilename(value: string) {
+    return value
+        .replace(/[/\\]/g, "-")
+        .replace(/[\u0000-\u001f\u007f]/g, "")
+        .trim();
+}
+
+function contentDispositionFilename(value: string | null) {
+    if (!value) return "";
+
+    const encoded = value.match(/filename\*\s*=\s*([^;]+)/i)?.[1]?.trim();
+    if (encoded) {
+        const unquoted = encoded.replace(/^"(.*)"$/, "$1");
+        const encodedValue = unquoted.match(/^[^']*'[^']*'(.*)$/)?.[1] ?? unquoted;
+        try {
+            return safeDownloadFilename(decodeURIComponent(encodedValue));
+        } catch {}
+    }
+
+    const plain = value.match(/filename\s*=\s*(?:"((?:\\.|[^"])*)"|([^;]+))/i);
+    const filename = plain?.[1]?.replace(/\\"/g, "\"") ?? plain?.[2]?.trim() ?? "";
+    return safeDownloadFilename(filename);
+}
+
+async function downloadDocumentationReport(
+    id: string,
+    fallbackFilename = `documentation-report-${id}`,
+): Promise<DocumentationReportDownload> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    try {
+        const response = await fetch(`${API_URL}/documentation/reports/${encodeURIComponent(id)}/download`, {
+            signal: controller.signal,
+        });
+        if (!response.ok) {
+            throw new ApiError(response.status, await responseErrorMessage(response));
+        }
+
+        const filename = contentDispositionFilename(response.headers.get("Content-Disposition"))
+            || safeDownloadFilename(fallbackFilename)
+            || `documentation-report-${id}`;
+
+        return {
+            blob: await response.blob(),
+            filename,
+            contentType: response.headers.get("Content-Type") || "application/octet-stream",
+        };
+    } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") {
+            throw new ApiError(0, "Request timeout");
+        }
+        throw error;
     } finally {
         clearTimeout(timeout);
     }
@@ -389,6 +496,14 @@ export const api = {
     deleteLabel: (id: string) => request<void>(`/labels/${id}`, { method: "DELETE" }),
     scanCode: (code: string) =>
         request<ScanResult>(`/scan/${encodeURIComponent(normalizeScanCode(code))}`),
+    createDocumentationReport: (data: CreateDocumentationReportRequest) =>
+        request<DocumentationReport>("/documentation/reports", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+    listDocumentationReports: () =>
+        request<DocumentationReport[]>("/documentation/reports"),
+    downloadDocumentationReport,
     listBackupTargets: () => request<BackupTarget[]>("/backup/targets"),
     createBackupTarget: (data: CreateBackupTargetRequest) =>
         request<BackupTarget>("/backup/targets", { method: "POST", body: JSON.stringify(data) }),

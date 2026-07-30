@@ -12,6 +12,7 @@ import (
 	sftptarget "github.com/Brain4Fish/storagetron/internal/backup/target/sftp"
 	"github.com/Brain4Fish/storagetron/internal/config"
 	"github.com/Brain4Fish/storagetron/internal/db"
+	documentation "github.com/Brain4Fish/storagetron/internal/documentation"
 	"github.com/Brain4Fish/storagetron/internal/handler"
 	appmetrics "github.com/Brain4Fish/storagetron/internal/metrics"
 	"github.com/Brain4Fish/storagetron/internal/repository"
@@ -53,6 +54,7 @@ func main() {
 	labelRepo := repository.NewLabelRepo(dbConn)
 	photoRepo := repository.NewPhotoRepo(dbConn)
 	backupRepo := backupstore.NewPostgres(dbConn)
+	documentationRepo := repository.NewDocumentationRepo(dbConn)
 
 	photoSvc := service.NewPhotoService(photoRepo, s3Client)
 	itemSvc := service.NewItemService(itemRepo, photoSvc)
@@ -87,6 +89,14 @@ func main() {
 	backupScheduler := backupcore.NewScheduler(backupRepo, logger)
 	backupWorker := backupcore.NewWorker(backupRepo, backupSvc, 10*time.Second, 2*time.Hour, logger)
 	backupHandler := backuphttp.NewHandler(backupRepo, backupSecrets, backupScheduler, logger)
+	documentationStore := documentation.NewFileStore(cfg.DocumentationReportsDir)
+	documentationSvc := documentation.NewService(
+		documentationRepo,
+		documentationStore,
+		documentation.NewXLSXRenderer(),
+		documentation.NewPDFRenderer(),
+	)
+	documentationHandler := handler.NewDocumentationHandler(documentationSvc, logger)
 
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
@@ -161,6 +171,9 @@ func main() {
 
 		r.Get("/scan/{code}", scanHandler.Scan)
 		r.Route("/backup", backupHandler.Routes)
+		r.Post("/documentation/reports", documentationHandler.Create)
+		r.Get("/documentation/reports", documentationHandler.List)
+		r.Get("/documentation/reports/{id}/download", documentationHandler.Download)
 	}
 
 	registerAPIRoutes(r)
