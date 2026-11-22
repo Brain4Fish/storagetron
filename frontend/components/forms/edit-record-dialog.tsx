@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -90,6 +90,28 @@ export function EditRecordDialog({
     const [draftLabelIds, setDraftLabelIds] = useState(selectedLabelIds);
     const [itemDocumentData, setItemDocumentData] = useState<ItemDocumentDraft>(initialItemDocumentDraft);
     const [containerDocumentData, setContainerDocumentData] = useState<ContainerDocumentDraft>(initialContainerDocumentDraft);
+    const titleRef = useRef<HTMLHeadingElement>(null);
+    const [viewport, setViewport] = useState<{ height: number; center: number }>();
+
+    useEffect(() => {
+        const visibleViewport = window.visualViewport;
+        if (!open || !visibleViewport) return;
+
+        // The software keyboard can shrink and pan the visual viewport without resizing the layout viewport.
+        const updateViewport = () => {
+            setViewport(visibleViewport.scale === 1 ? {
+                height: visibleViewport.height,
+                center: visibleViewport.offsetTop + visibleViewport.height / 2,
+            } : undefined);
+        };
+        updateViewport();
+        visibleViewport.addEventListener("resize", updateViewport);
+        visibleViewport.addEventListener("scroll", updateViewport);
+        return () => {
+            visibleViewport.removeEventListener("resize", updateViewport);
+            visibleViewport.removeEventListener("scroll", updateViewport);
+        };
+    }, [open]);
 
     useEffect(() => {
         if (open) {
@@ -151,98 +173,108 @@ export function EditRecordDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
+            <DialogContent
+                className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden p-0 transition-none"
+                style={viewport ? { top: viewport.center, maxHeight: `calc(${viewport.height}px - 2rem)` } : undefined}
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    titleRef.current?.focus({ preventScroll: true });
+                }}
+            >
+                <DialogHeader className="shrink-0 px-4 pb-1 pr-10 pt-4 sm:px-6 sm:pr-12 sm:pt-6">
+                    <DialogTitle ref={titleRef} tabIndex={-1} className="outline-none">{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={onSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="edit-name">Name</Label>
-                        <Input
-                            id="edit-name"
-                            value={draftName}
-                            onChange={(event) => setDraftName(event.target.value)}
-                        />
+                <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 [@media(pointer:coarse)]:[&_:is(input,select,textarea)]:text-base">
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-name">Name</Label>
+                            <Input
+                                id="edit-name"
+                                value={draftName}
+                                onChange={(event) => setDraftName(event.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-description">Description</Label>
+                            <Textarea
+                                id="edit-description"
+                                value={draftDescription}
+                                onChange={(event) => setDraftDescription(event.target.value)}
+                            />
+                        </div>
+
+                        {locations ? (
+                            <LocationSelect
+                                id="edit-location"
+                                locations={locations}
+                                value={draftLocationId}
+                                onChange={setDraftLocationId}
+                            />
+                        ) : null}
+
+                        {containerSelection ? (
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-container">Container</Label>
+                                <select
+                                    id="edit-container"
+                                    value={selectedContainerId}
+                                    onChange={(event) => setDraftContainerId(event.target.value)}
+                                    disabled={!containerOptions || isSaving}
+                                    className="h-9 w-full rounded-full border border-input bg-white/80 px-3 text-sm disabled:opacity-60"
+                                >
+                                    {containerOptions ? (
+                                        <>
+                                            <option value="">No container</option>
+                                            {containerOptions.map((container) => (
+                                                <option key={container.id} value={container.id}>{container.name}</option>
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <option value="">{containerSelection.loadError ? "Could not load containers" : "Loading containers..."}</option>
+                                    )}
+                                </select>
+                            </div>
+                        ) : null}
+
+                        {documentRecord?.kind === "item" ? (
+                            <ItemDocumentFields
+                                value={itemDocumentData}
+                                onChange={setItemDocumentData}
+                                idPrefix="edit-item-document"
+                            />
+                        ) : null}
+
+                        {documentRecord?.kind === "container" ? (
+                            <ContainerDocumentFields
+                                value={containerDocumentData}
+                                onChange={setContainerDocumentData}
+                                idPrefix="edit-container-document"
+                            />
+                        ) : null}
+
+                        {labels ? (
+                            <div className="space-y-2">
+                                <Label>Labels</Label>
+                                <LabelPicker labels={labels} selectedIds={draftLabelIds} onChange={setDraftLabelIds} />
+                            </div>
+                        ) : null}
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="edit-description">Description</Label>
-                        <Textarea
-                            id="edit-description"
-                            value={draftDescription}
-                            onChange={(event) => setDraftDescription(event.target.value)}
-                        />
-                    </div>
-
-                    {locations ? (
-                        <LocationSelect
-                            id="edit-location"
-                            locations={locations}
-                            value={draftLocationId}
-                            onChange={setDraftLocationId}
-                        />
-                    ) : null}
-
-                    {containerSelection ? (
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-container">Container</Label>
-                            <select
-                                id="edit-container"
-                                value={selectedContainerId}
-                                onChange={(event) => setDraftContainerId(event.target.value)}
-                                disabled={!containerOptions || isSaving}
-                                className="h-9 w-full rounded-full border border-input bg-white/80 px-3 text-sm disabled:opacity-60"
-                            >
-                                {containerOptions ? (
-                                    <>
-                                        <option value="">No container</option>
-                                        {containerOptions.map((container) => (
-                                            <option key={container.id} value={container.id}>{container.name}</option>
-                                        ))}
-                                    </>
-                                ) : (
-                                    <option value="">{containerSelection.loadError ? "Could not load containers" : "Loading containers..."}</option>
-                                )}
-                            </select>
+                    <DialogFooter className="mt-0 shrink-0 flex-col border-t px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
+                        {localError || error ? (
+                            <p role="alert" className="max-h-16 overflow-y-auto break-words text-sm text-destructive">{localError || error}</p>
+                        ) : null}
+                        <div className="flex flex-wrap justify-end gap-2">
+                            <Button type="button" variant="outline" className="h-11 flex-1 sm:h-9 sm:flex-none" onClick={() => onOpenChange(false)}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" className="h-11 flex-1 sm:h-9 sm:flex-none" disabled={isSaving}>
+                                {isSaving ? "Saving..." : "Save changes"}
+                            </Button>
                         </div>
-                    ) : null}
-
-                    {documentRecord?.kind === "item" ? (
-                        <ItemDocumentFields
-                            value={itemDocumentData}
-                            onChange={setItemDocumentData}
-                            idPrefix="edit-item-document"
-                        />
-                    ) : null}
-
-                    {documentRecord?.kind === "container" ? (
-                        <ContainerDocumentFields
-                            value={containerDocumentData}
-                            onChange={setContainerDocumentData}
-                            idPrefix="edit-container-document"
-                        />
-                    ) : null}
-
-                    {labels ? (
-                        <div className="space-y-2">
-                            <Label>Labels</Label>
-                            <LabelPicker labels={labels} selectedIds={draftLabelIds} onChange={setDraftLabelIds} />
-                        </div>
-                    ) : null}
-
-                    {localError || error ? (
-                        <p className="text-sm text-destructive">{localError || error}</p>
-                    ) : null}
-
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSaving}>
-                            {isSaving ? "Saving..." : "Save changes"}
-                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>

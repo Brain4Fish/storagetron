@@ -1,8 +1,9 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import { SearchableLabelPicker } from "@/components/labels/searchable-label-picker";
+import { EditRecordDialog } from "@/components/forms/edit-record-dialog";
 import { PrintLabelDialog } from "@/components/print-label-dialog";
 import { ItemsTable } from "@/components/table/items-table";
 import { ContainersTable } from "@/components/table/containers-table";
@@ -26,6 +27,44 @@ const containerDocumentDefaults = {
     value_currency: null,
     source_language: "ru",
 };
+
+test("item edit actions remain available when the visual viewport shrinks and pans", async () => {
+    const viewport = Object.assign(new EventTarget(), { height: 874, offsetTop: 0, scale: 1 });
+    vi.stubGlobal("visualViewport", viewport);
+    const onSave = vi.fn();
+    const onOpenChange = vi.fn();
+    try {
+        render(<EditRecordDialog open title="Edit item" description="Update item details."
+            name="Camera" onSave={onSave} onOpenChange={onOpenChange}
+            containerSelection={{
+                currentId: "first",
+                options: [{ id: "first", name: "First box" }, { id: "second", name: "Second box" }],
+            }}
+        />);
+        const dialog = screen.getByRole("dialog", { name: "Edit item" });
+        expect(dialog).toHaveStyle({ top: "437px" });
+
+        act(() => {
+            viewport.height = 420;
+            viewport.dispatchEvent(new Event("resize"));
+        });
+        expect(dialog).toHaveStyle({ top: "210px", maxHeight: "calc(420px - 2rem)" });
+
+        act(() => {
+            viewport.offsetTop = 40;
+            viewport.dispatchEvent(new Event("scroll"));
+        });
+        expect(dialog).toHaveStyle({ top: "250px" });
+
+        await userEvent.selectOptions(screen.getByRole("combobox", { name: "Container" }), "second");
+        await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ container_id: "second" }));
+        await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+    } finally {
+        vi.unstubAllGlobals();
+    }
+});
 
 test("searchable labels filter, select, remove, and create inline", async () => {
     const onChange = vi.fn();
