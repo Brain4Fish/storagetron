@@ -44,6 +44,25 @@ Mobile browsers require a secure context for camera access. The scanner works on
 address such as `http://192.168.x.x:3000` will not show a camera permission
 prompt. Serve the web UI over HTTPS for phone scanning.
 
+## Documentation reports
+
+The Documentation page supports existing Russian XLSX/PDF inventories and an
+English **Packing list (Word / DOCX)**. Word exports add a recipient name and an
+editable English/Russian declaration, group items by package, and retain source item text.
+Change the origin/destination fields for your route. Recipient name and both
+addresses are required; carrier, shipment date, and order number are optional for Word.
+Word files use portrait pages, omit shipment date/order number, indent goods
+descriptions, and use the sample’s three-row table: names/addresses, duplicated
+headings, then one continuous body with inventory on the left and a blank right
+half. Bag groups use three empty lines; the ITEM NO column shows `BAG №X (box name)`.
+Item comments have two extra leading spaces, including wrapped lines. Bold totals
+share the contents cell. The declaration defaults to English and Russian blocks
+separated by `<newpage>` on its own line. `<total_packages>`, `<customs_value>`,
+and `<owner_name>` fill in report values automatically. You can edit the full
+text, including signing fields; normal newlines are preserved. Clear the
+declaration field to omit it. Generated Word files appear in the same report history and
+download through the same-origin API.
+
 ## Build
 
 ```

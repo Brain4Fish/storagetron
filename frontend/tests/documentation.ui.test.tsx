@@ -212,6 +212,92 @@ test("empty history renders no section, table, or empty state", async () => {
     expect(screen.queryByText(/отчётов пока нет/i)).not.toBeInTheDocument();
 });
 
+test("Word packing list validates recipient and submits English headings with editable declarations", async () => {
+    const createReport = vi.spyOn(api, "createDocumentationReport").mockResolvedValue({
+        ...report, format: "docx", language: "en", filename: "packing-list.docx",
+    });
+    renderPage();
+    await fillRequiredSummary();
+    await userEvent.selectOptions(screen.getByLabelText("Формат"), "docx");
+    expect(screen.getByLabelText("Язык")).toHaveValue("en");
+    expect(screen.getByLabelText("Перевозчик")).not.toBeRequired();
+    expect(screen.getByLabelText("Дата отправки")).not.toBeRequired();
+    expect(screen.getByLabelText("Номер заказа транспортной компании")).not.toBeRequired();
+    expect((screen.getByLabelText("Декларация") as HTMLTextAreaElement).value).toContain("I hereby declare");
+    expect((screen.getByLabelText("Декларация") as HTMLTextAreaElement).value).toContain("Настоящим заявляю");
+    expect((screen.getByLabelText("Декларация") as HTMLTextAreaElement).value).toContain("Также заявляю");
+    expect(screen.getByText("<newpage>", { selector: "code" })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Локация"), "location-1");
+    await userEvent.click(screen.getByRole("button", { name: "Сформировать отчёт" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Укажите ФИО получателя");
+    expect(createReport).not.toHaveBeenCalled();
+    await userEvent.type(screen.getByLabelText("ФИО получателя"), "  Recipient Name  ");
+    await userEvent.clear(screen.getByLabelText("Страна назначения"));
+    await userEvent.type(screen.getByLabelText("Страна назначения"), "Netherlands");
+    await userEvent.clear(screen.getByLabelText("Декларация"));
+    await userEvent.type(screen.getByLabelText("Декларация"), "  My reviewed declaration.  ");
+    await userEvent.clear(screen.getByLabelText("Перевозчик"));
+    await userEvent.clear(screen.getByLabelText("Дата отправки"));
+    await userEvent.click(screen.getByRole("button", { name: "Сформировать отчёт" }));
+    await waitFor(() => expect(createReport).toHaveBeenCalledWith(expect.objectContaining({
+        format: "docx", language: "en",
+        summary: expect.objectContaining({
+            consignee_name: "Recipient Name", destination_country: "Netherlands",
+            declaration: "  My reviewed declaration.  ", carrier: "", shipment_date: "", transport_order_number: "",
+        }),
+    })));
+    expect(await screen.findByText("Отчёт сформирован")).toBeInTheDocument();
+    expect(screen.getByText("packing-list.docx")).toBeInTheDocument();
+});
+
+test("switching away from Word preserves draft fields and restores Russian inventory reports", async () => {
+    const createReport = vi.spyOn(api, "createDocumentationReport").mockResolvedValue(report);
+    renderPage();
+    await fillRequiredSummary();
+    await userEvent.selectOptions(screen.getByLabelText("Формат"), "docx");
+    await userEvent.type(screen.getByLabelText("ФИО получателя"), "Recipient");
+    await userEvent.clear(screen.getByLabelText("Декларация"));
+    await userEvent.selectOptions(screen.getByLabelText("Формат"), "pdf");
+    expect(screen.getByLabelText("Язык")).toHaveValue("ru");
+    expect(screen.queryByLabelText("ФИО получателя")).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Формат"), "docx");
+    expect(screen.getByLabelText("ФИО получателя")).toHaveValue("Recipient");
+    expect(screen.getByLabelText("Декларация")).toHaveValue("");
+    await userEvent.selectOptions(screen.getByLabelText("Формат"), "pdf");
+    await userEvent.selectOptions(screen.getByLabelText("Локация"), "location-1");
+    await userEvent.click(screen.getByRole("button", { name: "Сформировать отчёт" }));
+    await waitFor(() => expect(createReport).toHaveBeenCalledWith(expect.objectContaining({
+        format: "pdf", language: "ru",
+        summary: expect.objectContaining({ consignee_name: "", declaration: "" }),
+    })));
+});
+
+test("Word export submits the default English and Russian declarations together", async () => {
+    const createReport = vi.spyOn(api, "createDocumentationReport").mockResolvedValue({
+        ...report, format: "docx", language: "en", filename: "packing-list.docx",
+    });
+    renderPage();
+    await fillRequiredSummary();
+    await userEvent.selectOptions(screen.getByLabelText("Формат"), "docx");
+    await userEvent.type(screen.getByLabelText("ФИО получателя"), "Recipient");
+    await userEvent.selectOptions(screen.getByLabelText("Локация"), "location-1");
+    await userEvent.click(screen.getByRole("button", { name: "Сформировать отчёт" }));
+    await waitFor(() => expect(createReport).toHaveBeenCalled());
+    const declaration = createReport.mock.calls[0][0].summary.declaration ?? "";
+    expect(declaration).toContain("I hereby declare");
+    expect(declaration).toContain("I further declare");
+    expect(declaration).toContain("Настоящим заявляю");
+    expect(declaration).toContain("Также заявляю");
+    expect(declaration.split("\n").filter((line) => line === "<newpage>")).toHaveLength(1);
+    expect(declaration).toContain("Total packages: <total_packages>");
+    expect(declaration).toContain("Всего мест: <total_packages>");
+    expect(declaration).toContain("Value for customs purposes only: <customs_value>");
+    expect(declaration).toContain("Стоимость только для таможенных целей: <customs_value>");
+    expect(declaration).toContain("NAME: <owner_name>");
+    expect(declaration.indexOf("I further declare")).toBeLessThan(declaration.indexOf("<newpage>"));
+    expect(declaration.indexOf("<newpage>")).toBeLessThan(declaration.indexOf("Настоящим заявляю"));
+});
+
 test("history downloads through the API and uses the returned blob", async () => {
     const containerReport: DocumentationReport = {
         ...report,

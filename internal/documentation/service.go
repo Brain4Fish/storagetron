@@ -23,13 +23,14 @@ type Service struct {
 	renderers map[string]Renderer
 }
 
-func NewService(repo Repository, storage ReportStorage, xlsxRenderer, pdfRenderer Renderer) *Service {
+func NewService(repo Repository, storage ReportStorage, xlsxRenderer, pdfRenderer, docxRenderer Renderer) *Service {
 	return &Service{
 		repo:    repo,
 		storage: storage,
 		renderers: map[string]Renderer{
 			"xlsx": xlsxRenderer,
 			"pdf":  pdfRenderer,
+			"docx": docxRenderer,
 		},
 	}
 }
@@ -56,7 +57,7 @@ func (s *Service) Create(ctx context.Context, request model.CreateDocumentationR
 
 	renderer := s.renderers[req.Format]
 	if renderer == nil {
-		return model.DocumentationReportMetadata{}, validationError("format must be xlsx or pdf")
+		return model.DocumentationReportMetadata{}, validationError("format must be xlsx, pdf or docx")
 	}
 	prepared := PrepareReport(req, scope)
 	scopeJSON, err := json.Marshal(prepared.Scope)
@@ -73,6 +74,8 @@ func (s *Service) Create(ctx context.Context, request model.CreateDocumentationR
 	contentType := "application/pdf"
 	if req.Format == "xlsx" {
 		contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	} else if req.Format == "docx" {
+		contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 	}
 	size, err := s.storage.WriteAtomic(filename, func(writer io.Writer) error {
 		return renderer.Render(ctx, req.Language, writer, prepared)
@@ -143,11 +146,15 @@ func normalizeAndValidateRequest(req model.CreateDocumentationReportRequest) (mo
 	req.Format = strings.ToLower(strings.TrimSpace(req.Format))
 	req.Scope.Type = strings.ToLower(strings.TrimSpace(req.Scope.Type))
 
-	if req.Language != "ru" {
-		return req, validationError("language must be ru")
+	if req.Format != "xlsx" && req.Format != "pdf" && req.Format != "docx" {
+		return req, validationError("format must be xlsx, pdf or docx")
 	}
-	if req.Format != "xlsx" && req.Format != "pdf" {
-		return req, validationError("format must be xlsx or pdf")
+	if req.Format == "docx" {
+		if req.Language != "en" {
+			return req, validationError("language must be en for docx")
+		}
+	} else if req.Language != "ru" {
+		return req, validationError("language must be ru")
 	}
 	if req.Summary == nil {
 		return req, validationError("summary is required")
@@ -162,8 +169,21 @@ func normalizeAndValidateRequest(req model.CreateDocumentationReportRequest) (mo
 	if req.Summary.DestinationCountry == "" {
 		return req, validationError("summary.destination_country is required")
 	}
-	if _, err := time.Parse("2006-01-02", req.Summary.ShipmentDate); err != nil {
-		return req, validationError("summary.shipment_date must use yyyy-mm-dd")
+	if req.Format == "docx" {
+		if req.Summary.ConsigneeName == "" {
+			return req, validationError("summary.consignee_name is required")
+		}
+		if req.Summary.OriginAddress == "" {
+			return req, validationError("summary.origin_address is required")
+		}
+		if req.Summary.DestinationAddress == "" {
+			return req, validationError("summary.destination_address is required")
+		}
+	}
+	if req.Format != "docx" || req.Summary.ShipmentDate != "" {
+		if _, err := time.Parse("2006-01-02", req.Summary.ShipmentDate); err != nil {
+			return req, validationError("summary.shipment_date must use yyyy-mm-dd")
+		}
 	}
 
 	switch req.Scope.Type {
@@ -193,6 +213,10 @@ func normalizeAndValidateRequest(req model.CreateDocumentationReportRequest) (mo
 
 func normalizeSummary(summary *model.DocumentationSummary) {
 	summary.OwnerName = strings.TrimSpace(summary.OwnerName)
+	summary.ConsigneeName = strings.TrimSpace(summary.ConsigneeName)
+	if strings.TrimSpace(summary.Declaration) == "" {
+		summary.Declaration = ""
+	}
 	summary.Carrier = strings.TrimSpace(summary.Carrier)
 	summary.TransportOrderNumber = strings.TrimSpace(summary.TransportOrderNumber)
 	summary.OriginCountry = strings.TrimSpace(summary.OriginCountry)

@@ -54,6 +54,7 @@ flowchart TD
 - Browser UI for scanning, browsing, creating, editing, and printing inventory labels.
 - Export flows for CSV/XLSX label-printing workflows.
 - Russian-language XLSX and print-ready PDF moving inventories for Russia → Kazakhstan.
+- Editable English Word packing lists with sender/recipient details, items grouped by package, currency totals, and declarations.
 - Backup targets, schedules, manual backup runs, restore runs, and retention policy.
 - Prometheus metrics for HTTP traffic, build info, Postgres pool stats, backups, and restores.
 
@@ -106,7 +107,7 @@ The Compose credentials are development defaults. Replace every secret before us
 
 ## Moving inventory document data
 
-Items and containers can carry optional structured data for preparing a Russian-language moving inventory. The Documentation API uses these source fields to generate XLSX and print-ready PDF reports.
+Items and containers can carry optional structured data for moving inventories. The Documentation API uses these source fields to generate Russian XLSX/print-ready PDF inventories and English Word packing lists.
 
 Item fields:
 
@@ -349,11 +350,45 @@ For selected packages, use a container scope and choose either `xlsx` or `pdf`:
 }
 ```
 
-Only exact `language: "ru"` is supported in this version. Location scope includes every container assigned to the location, all items in those containers, and items assigned directly to the location that have no container. Container scope includes only the selected containers and their items. Duplicate container IDs and duplicate item membership do not produce duplicate rows.
+XLSX and PDF inventories require exact `language: "ru"`. Location scope includes every container assigned to the location, all items in those containers, and items assigned directly to the location that have no container. Container scope includes only the selected containers and their items. Duplicate container IDs and duplicate item membership do not produce duplicate rows.
 
 Values are never converted between currencies. Summary totals are grouped by currency. A container `estimated_value` replaces the values of its items in the overall totals; otherwise item values are used. If those items use one currency, their sum also appears in the container row. With multiple currencies, that row's value and currency remain blank while every currency is still represented in the summary.
 
-The server assigns the report filename. A blank transport order number produces a labelled, underlined field for handwriting in both formats.
+The server assigns the report filename. A blank transport order number produces a labelled field for handwriting in XLSX/PDF inventories. Word packing lists omit transport order number and shipment date, even when supplied.
+
+#### Word packing list
+
+In **Documentation**, select **Packing list (Word / DOCX)** to generate an editable, portrait A4 packing list. It contains shipper and consignee names/addresses, item descriptions and quantities grouped by package, package values, package count, customs-purpose value totals, and date/name/signature fields. English headings do not translate inventory names or descriptions. Change the country/address fields for your actual route; the form retains its existing Russia → Kazakhstan defaults.
+
+The same endpoint accepts `format: "docx"` with exact `language: "en"` and either scope type:
+
+```json
+{
+  "scope": { "type": "containers", "container_ids": ["{container_id}"] },
+  "format": "docx",
+  "language": "en",
+  "summary": {
+    "owner_name": "Sender Name",
+    "consignee_name": "Recipient Name",
+    "origin_country": "Kazakhstan",
+    "origin_address": "Almaty, street and house number",
+    "destination_country": "Netherlands",
+    "destination_address": "Amsterdam, street and house number",
+    "shipment_date": "2026-11-02",
+    "declaration": "Declaration text reviewed by the owner."
+  }
+}
+```
+
+For DOCX, `owner_name` is the shipper name; `consignee_name` and both addresses are required in addition to countries. Carrier, shipment date, and transport order number are optional. Shipment date and transport order number are never printed in the Word file; a supplied shipment date must still be a valid `yyyy-mm-dd` date. The form pre-fills a complete English declaration block followed by a Russian block on a new page. Each block includes package count, customs value, declaration statements, and signing fields. The whole block is editable. Review the text before signing. An omitted or empty `declaration` omits declaration text. Sender/recipient/declaration data is retained in the existing report request snapshot, not on inventory records.
+
+Declaration templates support `<newpage>` on a line by itself for a real Word page break. Ordinary newlines and leading spaces are preserved. The default uses it between the English and Russian blocks. It also uses `<total_packages>`, `<customs_value>`, and `<owner_name>` placeholders, replaced with the report's package count, currency totals, and owner name. Currency totals are joined with semicolons without conversion; an unknown customs value is shown as “—”. Tokens and page-break controls are replaced only in declaration text, and other markup is treated as literal text.
+
+A declaration containing these placeholders or a standalone `<newpage>` controls the complete block; automatic summary/signing fields are not added again. Existing plain declarations without these controls keep their automatic English summary and signing fields. Clearing the declaration still leaves that basic summary and signing area.
+
+Item values are **line totals**, so quantity does not multiply their value. Package overrides replace item sums in package and overall totals and are explicitly labelled. Mixed currencies have separate totals with no exchange conversion; missing values show “Not specified” and totals include stated values only. The Word table follows the supplied sample: exactly three rows, with shipper/consignee cells first, duplicated ITEM NO / DESCRIPTION OF GOODS / PCS / VALUE/PRICE headings next, and a single continuous body row last. Only the left four body columns contain inventory; the right four stay blank. The ITEM NO column uses `BAG №X (YYY)`: X is the sequential box number in report order and YYY is the saved box name (falling back to the existing package identifier when no name is available). Unpacked items remain an unnumbered group. Goods descriptions are indented, each item comment line starts with two additional spaces (including wrapped lines), and bold package totals share the contents cell. Groups are separated by three empty lines in the populated columns, without item or package cell borders. Mixed currencies are printed alongside amounts. Loose items form an Unpacked group and contribute to value totals but not the package count. Empty containers still count as packages. The continuous body can span portrait pages, with page numbers in the footer.
+
+Migration `009_packing_list_docx.sql` expands the allowed report formats and runs through the normal forward-only startup migration flow. DOCX generation runs within the Go API and requires no Office/LibreOffice service. Existing XLSX/PDF requests and saved downloads remain supported. This template reproduces the supplied packing-list structure; it is not a certification of customs acceptance.
 
 List the latest available files and download one by ID:
 

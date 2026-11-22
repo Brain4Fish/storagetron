@@ -131,3 +131,27 @@ func TestDocumentationHandlerErrorsAndDownloadHeaders(t *testing.T) {
 	router.ServeHTTP(response, request)
 	require.Equal(t, http.StatusInternalServerError, response.Code)
 }
+
+func TestDocumentationDOCXDownloadAtRootAndAPI(t *testing.T) {
+	id := uuid.New()
+	filename := "documentation-report-" + id.String() + ".docx"
+	path := filepath.Join(t.TempDir(), filename)
+	content := []byte{'P', 'K', 3, 4, 0, 1, 255}
+	require.NoError(t, os.WriteFile(path, content, 0o600))
+	contentType := "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	service := &fakeDocumentationHandlerService{
+		record: documentation.ReportRecord{ID: id, Filename: filename, ContentType: contentType}, path: path,
+	}
+	handler := NewDocumentationHandler(service, zap.NewNop())
+	router := chi.NewRouter()
+	router.Get("/documentation/reports/{id}/download", handler.Download)
+	router.Get("/api/documentation/reports/{id}/download", handler.Download)
+	for _, prefix := range []string{"", "/api"} {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, prefix+"/documentation/reports/"+id.String()+"/download", nil))
+		require.Equal(t, http.StatusOK, response.Code)
+		require.Equal(t, contentType, response.Header().Get("Content-Type"))
+		require.Contains(t, response.Header().Get("Content-Disposition"), filename)
+		require.Equal(t, content, response.Body.Bytes())
+	}
+}

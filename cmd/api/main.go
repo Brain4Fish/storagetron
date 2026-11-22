@@ -95,6 +95,7 @@ func main() {
 		documentationStore,
 		documentation.NewXLSXRenderer(),
 		documentation.NewPDFRenderer(),
+		documentation.NewDOCXRenderer(),
 	)
 	documentationHandler := handler.NewDocumentationHandler(documentationSvc, logger)
 

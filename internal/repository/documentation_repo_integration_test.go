@@ -7,6 +7,7 @@ import (
 	"time"
 
 	documentation "github.com/Brain4Fish/storagetron/internal/documentation"
+	"github.com/Brain4Fish/storagetron/pkg/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -113,4 +114,33 @@ func TestDocumentationRepositoryListNewestFirstLimit50(t *testing.T) {
 	for index := 1; index < len(reports); index++ {
 		require.True(t, reports[index-1].CreatedAt.After(reports[index].CreatedAt))
 	}
+}
+
+func TestDocumentationRepositoryDOCXFormatAfterMigrations(t *testing.T) {
+	pool := repositoryIntegrationPool(t)
+	repo := NewDocumentationRepo(pool)
+	ctx := context.Background()
+	scope, err := json.Marshal(documentation.ScopeSnapshot{Type: "containers"})
+	require.NoError(t, err)
+	request, err := json.Marshal(model.CreateDocumentationReportRequest{
+		Format: "docx", Language: "en",
+		Summary: &model.DocumentationSummary{OwnerName: "Sender", ConsigneeName: "Recipient", Declaration: "Reviewed text"},
+	})
+	require.NoError(t, err)
+	id := uuid.New()
+	filename := "documentation-report-" + id.String() + ".docx"
+	record := documentation.ReportRecord{
+		ID: id, Filename: filename, RelativePath: filename, Format: "docx", Language: "en",
+		ScopeType: "containers", ScopeSnapshot: scope, RequestSnapshot: request,
+		ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", SizeBytes: 1024,
+	}
+	require.NoError(t, repo.InsertReport(ctx, &record))
+	stored, err := repo.GetReport(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, "docx", stored.Format)
+	require.Equal(t, record.ContentType, stored.ContentType)
+	var snapshot model.CreateDocumentationReportRequest
+	require.NoError(t, json.Unmarshal(stored.RequestSnapshot, &snapshot))
+	require.Equal(t, "Recipient", snapshot.Summary.ConsigneeName)
+	require.Equal(t, "Reviewed text", snapshot.Summary.Declaration)
 }
