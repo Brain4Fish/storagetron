@@ -242,6 +242,16 @@ curl -X POST http://localhost:8086/containers/{container_id}/items \
   -d '{"item_id":"{item_id}"}'
 ```
 
+Move an item by choosing a container in **Edit Item** and saving. The API updates the assignment through `PATCH /items/{id}`:
+
+```bash
+curl -X PATCH http://localhost:8086/items/{item_id} \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Laptop","description":"Work laptop in black sleeve","location_id":null,"container_id":"{container_id}"}'
+```
+
+Set `container_id` to a container UUID to assign or move the item, or to `null` to remove it from its container. Omitting `container_id` preserves the current assignment.
+
 Create and attach a reusable organizational label:
 
 ```bash

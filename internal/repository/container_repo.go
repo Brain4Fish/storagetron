@@ -175,7 +175,17 @@ func (r *ContainerRepo) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (r *ContainerRepo) AddItem(ctx context.Context, containerID, itemID uuid.UUID) error {
-	cmd, err := r.db.Exec(ctx, `
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Serialize with item edits before checking the current membership.
+	if _, err := tx.Exec(ctx, `SELECT id FROM items WHERE id = $1 FOR NO KEY UPDATE`, itemID); err != nil {
+		return err
+	}
+	cmd, err := tx.Exec(ctx, `
 		INSERT INTO item_container (item_id, container_id)
 		SELECT $1, $2
 		WHERE NOT EXISTS (
@@ -190,7 +200,7 @@ func (r *ContainerRepo) AddItem(ctx context.Context, containerID, itemID uuid.UU
 	if cmd.RowsAffected() == 0 {
 		return pgx.ErrNoRows
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 func (r *ContainerRepo) RemoveItem(ctx context.Context, containerID, itemID uuid.UUID) error {

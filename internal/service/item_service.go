@@ -13,7 +13,7 @@ type ItemRepo interface {
 	List(context.Context) ([]model.Item, error)
 	ListPage(context.Context, int, int) ([]model.Item, int, error)
 	Get(context.Context, uuid.UUID) (model.Item, error)
-	Update(context.Context, uuid.UUID, model.Item) error
+	Update(context.Context, uuid.UUID, model.Item, model.Optional[uuid.UUID]) error
 	Delete(context.Context, uuid.UUID) error
 	AttachLabel(context.Context, uuid.UUID, uuid.UUID) error
 	DetachLabel(context.Context, uuid.UUID, uuid.UUID) error
@@ -107,7 +107,7 @@ func (s *ItemService) Update(ctx context.Context, id uuid.UUID, req model.Update
 	if err := applyItemUpdate(&item, req); err != nil {
 		return model.Item{}, err
 	}
-	if err := s.repo.Update(ctx, id, item); err != nil {
+	if err := s.repo.Update(ctx, id, item, req.ContainerID); err != nil {
 		return model.Item{}, err
 	}
 	return s.Get(ctx, id)

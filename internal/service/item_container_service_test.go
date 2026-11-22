@@ -350,7 +350,7 @@ func (r *fakeItemRepository) Get(_ context.Context, id uuid.UUID) (model.Item, e
 	return r.item, nil
 }
 
-func (r *fakeItemRepository) Update(_ context.Context, _ uuid.UUID, item model.Item) error {
+func (r *fakeItemRepository) Update(_ context.Context, _ uuid.UUID, item model.Item, _ model.Optional[uuid.UUID]) error {
 	r.updated = item
 	r.item = item
 	return nil

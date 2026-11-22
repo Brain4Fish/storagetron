@@ -75,6 +75,61 @@ func TestRepositoryIntegrationItemContainerLabelsAndInheritedLocation(t *testing
 	require.ErrorIs(t, err, pgx.ErrNoRows)
 }
 
+func TestRepositoryIntegrationMoveItemBetweenContainers(t *testing.T) {
+	pool := repositoryIntegrationPool(t)
+	ctx := context.Background()
+	itemRepo := NewItemRepo(pool)
+	containerRepo := NewContainerRepo(pool)
+	locationRepo := NewLocationRepo(pool)
+
+	oldID, newID, locationID := uuid.New(), uuid.New(), uuid.New()
+	require.NoError(t, locationRepo.Create(ctx, model.Location{ID: locationID, Room: "Office"}))
+	require.NoError(t, containerRepo.Create(ctx, model.Container{
+		ID: oldID, Name: "First box", PackageCode: "MOVE-1", SourceLanguage: "ru",
+	}, ""))
+	require.NoError(t, containerRepo.Create(ctx, model.Container{
+		ID: newID, Name: "Second box", PackageCode: "MOVE-2", LocationID: &locationID, SourceLanguage: "ru",
+	}, ""))
+
+	item := model.Item{ID: uuid.New(), Name: "Keyboard", Quantity: 1, Condition: "used", SourceLanguage: "ru"}
+	require.NoError(t, itemRepo.Create(ctx, item, ""))
+	require.NoError(t, containerRepo.AddItem(ctx, oldID, item.ID))
+
+	missingID := uuid.New()
+	item.Name = "Updated keyboard"
+	err := itemRepo.Update(ctx, item.ID, item, model.Optional[uuid.UUID]{Set: true, Value: &missingID})
+	require.ErrorIs(t, err, model.ErrContainerNotFound)
+	stored, err := itemRepo.Get(ctx, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Keyboard", stored.Name)
+	oldContainer, err := containerRepo.Get(ctx, oldID)
+	require.NoError(t, err)
+	require.Len(t, oldContainer.Items, 1)
+	require.Equal(t, item.ID, oldContainer.Items[0].ID)
+
+	move := model.Optional[uuid.UUID]{Set: true, Value: &newID}
+	require.NoError(t, itemRepo.Update(ctx, item.ID, item, move))
+	require.NoError(t, itemRepo.Update(ctx, item.ID, item, move))
+	require.NoError(t, itemRepo.Update(ctx, item.ID, item, model.Optional[uuid.UUID]{}))
+	oldContainer, err = containerRepo.Get(ctx, oldID)
+	require.NoError(t, err)
+	require.Empty(t, oldContainer.Items)
+	newContainer, err := containerRepo.Get(ctx, newID)
+	require.NoError(t, err)
+	require.Len(t, newContainer.Items, 1)
+	require.Equal(t, item.ID, newContainer.Items[0].ID)
+	stored, err = itemRepo.Get(ctx, item.ID)
+	require.NoError(t, err)
+	require.Equal(t, item.Name, stored.Name)
+	require.NotNil(t, stored.InheritedLocation)
+	require.Equal(t, locationID, stored.InheritedLocation.ID)
+
+	require.NoError(t, itemRepo.Update(ctx, item.ID, item, model.Optional[uuid.UUID]{Set: true}))
+	newContainer, err = containerRepo.Get(ctx, newID)
+	require.NoError(t, err)
+	require.Empty(t, newContainer.Items)
+}
+
 func TestRepositoryIntegrationDocumentFieldsRoundTripAndPackageCodeUniqueness(t *testing.T) {
 	pool := repositoryIntegrationPool(t)
 	ctx := context.Background()
@@ -118,7 +173,7 @@ func TestRepositoryIntegrationDocumentFieldsRoundTripAndPackageCodeUniqueness(t 
 	storedItem.AcquisitionYear = nil
 	storedItem.EstimatedValue = nil
 	storedItem.ValueCurrency = nil
-	require.NoError(t, itemRepo.Update(ctx, storedItem.ID, storedItem))
+	require.NoError(t, itemRepo.Update(ctx, storedItem.ID, storedItem, model.Optional[uuid.UUID]{}))
 	storedItem, err = itemRepo.Get(ctx, storedItem.ID)
 	require.NoError(t, err)
 	require.Nil(t, storedItem.AcquisitionYear)
