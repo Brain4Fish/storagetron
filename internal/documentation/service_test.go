@@ -125,7 +125,7 @@ func TestServiceCreatesBothScopeTypesAndPersistsLanguageSnapshots(t *testing.T) 
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeDocumentationRepository{locationScope: tt.resolvedSnapshot, containerScope: tt.resolvedSnapshot}
 			store := NewFileStore(t.TempDir())
-			service := NewService(repo, store, testRenderer{}, testRenderer{})
+			service := NewService(repo, store, testRenderer{}, testRenderer{}, NewDOCXRenderer())
 
 			metadata, err := service.Create(context.Background(), validDocumentationRequest(tt.scope))
 			require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestRequestValidationLanguageScopeAndUnknownUUID(t *testing.T) {
 			request.Summary = &summary
 			tt.mutate(&request)
 			repo := &fakeDocumentationRepository{}
-			service := NewService(repo, NewFileStore(t.TempDir()), testRenderer{}, testRenderer{})
+			service := NewService(repo, NewFileStore(t.TempDir()), testRenderer{}, testRenderer{}, NewDOCXRenderer())
 			_, err := service.Create(context.Background(), request)
 			require.Error(t, err)
 			require.True(t, IsValidationError(err))
@@ -181,7 +181,7 @@ func TestRequestValidationLanguageScopeAndUnknownUUID(t *testing.T) {
 	}
 
 	repo := &fakeDocumentationRepository{resolveErr: ErrScopeNotFound}
-	service := NewService(repo, NewFileStore(t.TempDir()), testRenderer{}, testRenderer{})
+	service := NewService(repo, NewFileStore(t.TempDir()), testRenderer{}, testRenderer{}, NewDOCXRenderer())
 	_, err := service.Create(context.Background(), valid)
 	require.ErrorIs(t, err, ErrScopeNotFound)
 }
@@ -264,7 +264,7 @@ func TestStorageAtomicCleanupMetadataFailureAndPathTraversal(t *testing.T) {
 		locationScope: ScopeSnapshot{Type: "location", Containers: []ContainerSnapshot{}, LooseItems: []ItemSnapshot{}},
 		insertErr:     errors.New("metadata unavailable"),
 	}
-	service := NewService(repo, store, testRenderer{}, testRenderer{})
+	service := NewService(repo, store, testRenderer{}, testRenderer{}, NewDOCXRenderer())
 	_, err = service.Create(context.Background(), validDocumentationRequest(model.DocumentationScope{Type: "location", LocationID: &locationID}))
 	require.Error(t, err)
 	entries, readErr = os.ReadDir(dir)
@@ -289,7 +289,7 @@ func TestListHardcodedLimitAndMissingFiles(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, filename), []byte("%PDF"), 0o600))
 		}
 	}
-	service := NewService(repo, store, testRenderer{}, testRenderer{})
+	service := NewService(repo, store, testRenderer{}, testRenderer{}, NewDOCXRenderer())
 	reports, err := service.List(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, 50, repo.listLimit)
@@ -322,7 +322,7 @@ func TestServiceOpenRejectsMissingAndUnsafeMetadataPaths(t *testing.T) {
 		ID: id, Filename: "documentation-report-" + id.String() + ".pdf",
 		RelativePath: "../outside.pdf",
 	}}}
-	service := NewService(repo, NewFileStore(t.TempDir()), testRenderer{}, testRenderer{})
+	service := NewService(repo, NewFileStore(t.TempDir()), testRenderer{}, testRenderer{}, NewDOCXRenderer())
 	_, _, _, err := service.Open(context.Background(), id)
 	require.ErrorIs(t, err, ErrReportNotFound)
 

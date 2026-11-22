@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var reportFilenamePattern = regexp.MustCompile(`^documentation-report-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(xlsx|pdf)$`)
+var reportFilenamePattern = regexp.MustCompile(`^documentation-report-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(xlsx|pdf|docx)$`)
 
 type FileStore struct {
 	dir string

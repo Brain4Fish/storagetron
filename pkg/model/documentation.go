@@ -14,6 +14,8 @@ type DocumentationScope struct {
 
 type DocumentationSummary struct {
 	OwnerName            string `json:"owner_name"`
+	ConsigneeName        string `json:"consignee_name,omitempty"`
+	Declaration          string `json:"declaration,omitempty"`
 	Carrier              string `json:"carrier"`
 	TransportOrderNumber string `json:"transport_order_number"`
 	OriginCountry        string `json:"origin_country"`

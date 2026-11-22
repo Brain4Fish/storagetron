@@ -154,11 +154,13 @@ export type VersionInfo = {
 };
 
 export type DocumentationScopeType = "location" | "containers";
-export type DocumentationReportFormat = "xlsx" | "pdf";
-export type DocumentationLanguage = "ru";
+export type DocumentationReportFormat = "xlsx" | "pdf" | "docx";
+export type DocumentationLanguage = "ru" | "en";
 
 export type DocumentationSummary = {
     owner_name: string;
+    consignee_name?: string;
+    declaration?: string;
     carrier: string;
     transport_order_number: string;
     origin_country: string;

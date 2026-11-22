@@ -22,6 +22,21 @@ import { Label } from "@/components/ui/label";
 
 const initialSummary: DocumentationSummary = {
     owner_name: "",
+    consignee_name: "",
+    declaration: [
+        "Total packages: <total_packages>",
+        "Value for customs purposes only: <customs_value>",
+        "  I hereby declare that I have not packed any tobacco products, alcohol or any hazardous or inflammable materials.",
+        "  I further declare that, to the best of my knowledge and belief, the above statement and particulars, whether written by me or others on my behalf, are true and complete.",
+        "DATE: ____________________",
+        "NAME: <owner_name>",
+        "<newpage>",
+        "Всего мест: <total_packages>",
+        "Стоимость только для таможенных целей: <customs_value>",
+        "   Настоящим заявляю, что в упакованных вещах отсутствуют табачные изделия, алкоголь, опасные или легковоспламеняющиеся материалы.",
+        "   Также заявляю, что, насколько мне известно, приведённые выше сведения, заполненные мной или другими лицами от моего имени, являются достоверными и полными.",
+        "ДАТА: ____________________",
+    ].join("\n"),
     carrier: "",
     transport_order_number: "",
     origin_country: "Россия",
@@ -81,7 +96,7 @@ export default function DocumentationPage() {
         setFormError("");
         setLatestReport(null);
 
-        const validationError = validateDocumentationForm(summary, scopeType, locationId, selectedContainerIds);
+        const validationError = validateDocumentationForm(summary, scopeType, locationId, selectedContainerIds, format);
         if (validationError) {
             setFormError(validationError);
             return;
@@ -94,8 +109,8 @@ export default function DocumentationPage() {
         createMutation.mutate({
             scope,
             format,
-            language: "ru",
-            summary: trimSummary(summary),
+            language: format === "docx" ? "en" : "ru",
+            summary: trimSummary(format === "docx" ? summary : { ...summary, consignee_name: "", declaration: "" }),
         });
     };
 
@@ -144,19 +159,23 @@ export default function DocumentationPage() {
                         <h2 id="documentation-summary-heading" className="text-lg font-semibold tracking-tight">Summary</h2>
                         <div className="mt-4 grid gap-4 sm:grid-cols-2">
                             <TextField id="documentation-owner" label="ФИО владельца" value={summary.owner_name} required onChange={(value) => updateSummary("owner_name", value)} />
-                            <TextField id="documentation-carrier" label="Перевозчик" value={summary.carrier} required onChange={(value) => updateSummary("carrier", value)} />
+                            {format === "docx" ? (
+                                <TextField id="documentation-consignee" label="ФИО получателя" value={summary.consignee_name ?? ""} required onChange={(value) => updateSummary("consignee_name", value)} />
+                            ) : null}
+                            <TextField id="documentation-carrier" label="Перевозчик" value={summary.carrier} required={format !== "docx"} onChange={(value) => updateSummary("carrier", value)} />
                             <div className="space-y-2 sm:col-span-2">
                                 <Label htmlFor="documentation-order-number">Номер заказа транспортной компании</Label>
                                 <Input id="documentation-order-number" value={summary.transport_order_number} onChange={(event) => updateSummary("transport_order_number", event.target.value)} />
                                 <p className="text-xs leading-relaxed text-muted-foreground">
-                                    Если оставить поле пустым, в отчёте останется место для ручного заполнения.
+                                    {format === "docx" ? "Необязательно. Номер заказа не включается в Word-файл." : "Если оставить поле пустым, в отчёте останется место для ручного заполнения."}
                                 </p>
                             </div>
                             <TextField id="documentation-origin-country" label="Страна отправления" value={summary.origin_country} required onChange={(value) => updateSummary("origin_country", value)} />
                             <TextField id="documentation-origin-address" label="Адрес отправления" value={summary.origin_address} required onChange={(value) => updateSummary("origin_address", value)} />
                             <TextField id="documentation-destination-country" label="Страна назначения" value={summary.destination_country} required onChange={(value) => updateSummary("destination_country", value)} />
                             <TextField id="documentation-destination-address" label="Адрес назначения" value={summary.destination_address} required onChange={(value) => updateSummary("destination_address", value)} />
-                            <TextField id="documentation-shipment-date" label="Дата отправки" type="date" value={summary.shipment_date} required onChange={(value) => updateSummary("shipment_date", value)} />
+                            <TextField id="documentation-shipment-date" label="Дата отправки" type="date" value={summary.shipment_date} required={format !== "docx"} onChange={(value) => updateSummary("shipment_date", value)} />
+                            {format === "docx" ? <p className="text-xs text-muted-foreground sm:col-span-2">Дата отправки необязательна и не включается в Word-файл.</p> : null}
                         </div>
                     </section>
 
@@ -212,14 +231,37 @@ export default function DocumentationPage() {
                     </section>
 
                     <section className="mt-7 grid gap-4 border-t border-border pt-6 sm:grid-cols-2">
-                        <SelectField id="documentation-format" label="Формат" value={format} onChange={(value) => setFormat(value as DocumentationReportFormat)}>
+                        <SelectField id="documentation-format" label="Формат" value={format} onChange={(value) => { setFormat(value as DocumentationReportFormat); setFormError(""); }}>
                             <option value="xlsx">XLSX</option>
                             <option value="pdf">PDF</option>
+                            <option value="docx">Packing list (Word / DOCX)</option>
                         </SelectField>
-                        <SelectField id="documentation-language" label="Язык" value="ru" onChange={() => undefined}>
-                            <option value="ru">Русский</option>
+                        <SelectField id="documentation-language" label="Язык" value={format === "docx" ? "en" : "ru"} onChange={() => undefined}>
+                            {format === "docx" ? <option value="en">English</option> : <option value="ru">Русский</option>}
                         </SelectField>
                     </section>
+
+                    {format === "docx" ? (
+                        <section className="mt-5 space-y-2">
+                            <p className="text-sm text-muted-foreground">
+                                Упаковочный лист: отправитель и получатель, содержимое по коробкам, количество, стоимость и место для подписи. Заголовки на английском; названия и описания вещей сохраняются как введены. Страны и адреса можно изменить для нужного маршрута.
+                            </p>
+                            <Label htmlFor="documentation-declaration">Декларация</Label>
+                            <textarea
+                                id="documentation-declaration"
+                                value={summary.declaration ?? ""}
+                                onChange={(event) => updateSummary("declaration", event.target.value)}
+                                rows={18}
+                                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm"
+                                aria-describedby="documentation-declaration-help"
+                            />
+                            <div id="documentation-declaration-help" className="space-y-1 text-xs text-muted-foreground">
+                                <p>Каждая строка переносится в документ. Для новой страницы вставьте <code>{"<newpage>"}</code> отдельной строкой.</p>
+                                <p>Подстановки: <code>{"<total_packages>"}</code> — количество мест; <code>{"<customs_value>"}</code> — стоимость по валютам; <code>{"<owner_name>"}</code> — ФИО владельца. Значения подставятся автоматически.</p>
+                                <p>Можно изменить весь текст, включая даты и подписи. Проверьте его перед подписанием. Очистите поле, чтобы убрать декларацию.</p>
+                            </div>
+                        </section>
+                    ) : null}
 
                     {formError ? (
                         <p role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -487,14 +529,16 @@ function validateDocumentationForm(
     scopeType: DocumentationScopeType,
     locationId: string,
     containerIds: Set<string>,
+    format: DocumentationReportFormat,
 ) {
     if (!summary.owner_name.trim()) return "Укажите ФИО владельца.";
-    if (!summary.carrier.trim()) return "Укажите перевозчика.";
+    if (format === "docx" && !summary.consignee_name?.trim()) return "Укажите ФИО получателя.";
+    if (format !== "docx" && !summary.carrier.trim()) return "Укажите перевозчика.";
     if (!summary.origin_country.trim()) return "Укажите страну отправления.";
     if (!summary.origin_address.trim()) return "Укажите адрес отправления.";
     if (!summary.destination_country.trim()) return "Укажите страну назначения.";
     if (!summary.destination_address.trim()) return "Укажите адрес назначения.";
-    if (!summary.shipment_date) return "Укажите дату отправки.";
+    if (format !== "docx" && !summary.shipment_date) return "Укажите дату отправки.";
     if (scopeType === "location" && !locationId) return "Выберите локацию.";
     if (scopeType === "containers" && containerIds.size === 0) return "Выберите хотя бы одну коробку.";
     return "";
@@ -502,7 +546,7 @@ function validateDocumentationForm(
 
 function trimSummary(summary: DocumentationSummary): DocumentationSummary {
     return Object.fromEntries(
-        Object.entries(summary).map(([key, value]) => [key, value.trim()]),
+        Object.entries(summary).map(([key, value]) => [key, key === "declaration" ? value : value?.trim()]),
     ) as DocumentationSummary;
 }
 
@@ -514,13 +558,17 @@ function documentationErrorMessage(error: unknown, fallback = "Не удалос
 
     const messages: Record<string, string> = {
         "summary.owner_name is required": "Укажите ФИО владельца.",
+        "summary.consignee_name is required": "Укажите ФИО получателя.",
+        "summary.origin_address is required": "Укажите адрес отправления.",
+        "summary.destination_address is required": "Укажите адрес назначения.",
         "summary.origin_country is required": "Укажите страну отправления.",
         "summary.destination_country is required": "Укажите страну назначения.",
         "summary.shipment_date must use yyyy-mm-dd": "Укажите корректную дату отправки.",
         "location scope requires location_id only": "Выберите одну локацию.",
         "containers scope requires non-empty container_ids only": "Выберите хотя бы одну коробку.",
         "language must be ru": "Выбранный язык пока не поддерживается.",
-        "format must be xlsx or pdf": "Выберите формат XLSX или PDF.",
+        "language must be en for docx": "Для упаковочного листа Word выберите английский язык.",
+        "format must be xlsx, pdf or docx": "Выберите формат XLSX, PDF или Word.",
     };
     return messages[error.message] || (error.status === 0 ? "Сервер не ответил вовремя. Попробуйте ещё раз." : `${fallback} ${error.message}`);
 }
@@ -545,7 +593,7 @@ function pluralizeContainers(count: number) {
 }
 
 function languageLabel(language: string) {
-    return language === "ru" ? "Русский" : language;
+    return language === "ru" ? "Русский" : language === "en" ? "English" : language;
 }
 
 function formatBytes(value: number) {
