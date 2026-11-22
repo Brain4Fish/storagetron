@@ -51,6 +51,11 @@ type Props = {
     details?: string;
     locationId?: string;
     locations?: Location[];
+    containerSelection?: {
+        currentId?: string;
+        options?: Pick<Container, "id" | "name">[];
+        loadError?: boolean;
+    };
     labels?: InventoryLabel[];
     selectedLabelIds?: string[];
     documentRecord?: DocumentRecord;
@@ -68,6 +73,7 @@ export function EditRecordDialog({
     details = "",
     locationId = "",
     locations,
+    containerSelection,
     labels,
     selectedLabelIds = EMPTY_LABEL_IDS,
     documentRecord,
@@ -79,6 +85,7 @@ export function EditRecordDialog({
     const [draftName, setDraftName] = useState(name);
     const [draftDescription, setDraftDescription] = useState(details);
     const [draftLocationId, setDraftLocationId] = useState(locationId);
+    const [draftContainerId, setDraftContainerId] = useState<string>();
     const [localError, setLocalError] = useState("");
     const [draftLabelIds, setDraftLabelIds] = useState(selectedLabelIds);
     const [itemDocumentData, setItemDocumentData] = useState<ItemDocumentDraft>(initialItemDocumentDraft);
@@ -99,6 +106,17 @@ export function EditRecordDialog({
             }
         }
     }, [details, documentRecord, locationId, name, open, selectedLabelIds]);
+
+    useEffect(() => {
+        if (!open) setDraftContainerId(undefined);
+    }, [open]);
+
+    const currentContainerId = containerSelection?.currentId ?? "";
+    const containerOptions = containerSelection?.options;
+    const selectedContainerId = draftContainerId !== undefined &&
+        (draftContainerId === "" || containerOptions?.some(({ id }) => id === draftContainerId))
+        ? draftContainerId
+        : currentContainerId;
 
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -122,6 +140,9 @@ export function EditRecordDialog({
             name: draftName.trim(),
             description: draftDescription.trim(),
             ...(locations ? { location_id: draftLocationId || null } : {}),
+            ...(containerOptions && selectedContainerId !== currentContainerId
+                ? { container_id: selectedContainerId || null }
+                : {}),
             ...(documentRecord?.kind === "item" ? itemDocumentPayload(itemDocumentData) : {}),
             ...(documentRecord?.kind === "container" ? containerDocumentPayload(containerDocumentData) : {}),
             ...(labels ? { label_ids: draftLabelIds } : {}),
@@ -162,6 +183,30 @@ export function EditRecordDialog({
                             value={draftLocationId}
                             onChange={setDraftLocationId}
                         />
+                    ) : null}
+
+                    {containerSelection ? (
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-container">Container</Label>
+                            <select
+                                id="edit-container"
+                                value={selectedContainerId}
+                                onChange={(event) => setDraftContainerId(event.target.value)}
+                                disabled={!containerOptions || isSaving}
+                                className="h-9 w-full rounded-full border border-input bg-white/80 px-3 text-sm disabled:opacity-60"
+                            >
+                                {containerOptions ? (
+                                    <>
+                                        <option value="">No container</option>
+                                        {containerOptions.map((container) => (
+                                            <option key={container.id} value={container.id}>{container.name}</option>
+                                        ))}
+                                    </>
+                                ) : (
+                                    <option value="">{containerSelection.loadError ? "Could not load containers" : "Loading containers..."}</option>
+                                )}
+                            </select>
+                        </div>
                     ) : null}
 
                     {documentRecord?.kind === "item" ? (

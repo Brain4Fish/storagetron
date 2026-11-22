@@ -149,7 +149,7 @@ func (r *scanItemRepo) Get(context.Context, uuid.UUID) (model.Item, error) {
 	return r.item, r.itemErr
 }
 
-func (r *scanItemRepo) Update(context.Context, uuid.UUID, model.Item) error {
+func (r *scanItemRepo) Update(context.Context, uuid.UUID, model.Item, model.Optional[uuid.UUID]) error {
 	return nil
 }
 

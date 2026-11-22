@@ -54,12 +54,12 @@ export default function ItemDetailsPage() {
         queryFn: api.listLocations,
     });
     const { data: labels = [] } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels });
-    const { data: containers = [] } = useQuery({
+    const { data: containers, isError: containersError } = useQuery({
         queryKey: ["containers"],
         queryFn: api.listContainers,
     });
 
-    const row = useMemo(() => data ? buildItemRows([data], containers)[0] : null, [containers, data]);
+    const row = useMemo(() => data ? buildItemRows([data], containers ?? [])[0] : null, [containers, data]);
     const selectedLabelIds = useMemo(() => (data?.labels ?? []).map((label) => label.id), [data?.labels]);
 
     const updateMutation = useMutation({
@@ -73,14 +73,9 @@ export default function ItemDetailsPage() {
             ]);
             if (results.some((result) => result.status === "rejected")) throw new Error("Item details were saved, but some label changes failed. Try saving again.");
         },
-        onSuccess: async () => {
+        onSuccess: () => {
             setEditError("");
             setEditOpen(false);
-            await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ["item", id] }),
-                queryClient.invalidateQueries({ queryKey: ["items"] }),
-                queryClient.invalidateQueries({ queryKey: ["containers"] }),
-            ]);
         },
         onError: (err) => setEditError(err instanceof Error ? err.message : "Failed to update item"),
         onSettled: async () => {
@@ -88,6 +83,8 @@ export default function ItemDetailsPage() {
                 queryClient.invalidateQueries({ queryKey: ["item", id] }),
                 queryClient.invalidateQueries({ queryKey: ["items"] }),
                 queryClient.invalidateQueries({ queryKey: ["containers"] }),
+                queryClient.invalidateQueries({ queryKey: ["container"] }),
+                queryClient.invalidateQueries({ queryKey: ["scan"] }),
             ]);
         },
     });
@@ -287,11 +284,16 @@ export default function ItemDetailsPage() {
             <EditRecordDialog
                 open={editOpen}
                 title="Edit item"
-                description="Rename this item or update its description."
+                description="Update this item’s details or move it to another container."
                 name={data.name}
                 details={data.description}
                 locationId={data.location_id ?? ""}
                 locations={locations}
+                containerSelection={{
+                    currentId: row.container?.id,
+                    options: containers,
+                    loadError: containersError,
+                }}
                 labels={labels}
                 selectedLabelIds={selectedLabelIds}
                 documentRecord={{ kind: "item", value: data }}

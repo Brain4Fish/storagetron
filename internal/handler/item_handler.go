@@ -162,6 +162,10 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.Update(ctx, id, req)
 	if err != nil {
+		if errors.Is(err, model.ErrContainerNotFound) {
+			respondErr(w, http.StatusNotFound, err.Error())
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			respondErr(w, http.StatusNotFound, "item not found")
 			return

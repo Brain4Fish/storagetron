@@ -125,3 +125,37 @@ test("container editing submits changed document fields", async () => {
         value_currency: "RUB",
     }));
 });
+
+test("item editing shows the current container and submits a different selection", async () => {
+    const onSave = vi.fn();
+    render(
+        <EditRecordDialog
+            open
+            title="Edit item"
+            description="Move this item"
+            name={item.name}
+            documentRecord={{ kind: "item", value: item }}
+            containerSelection={{
+                currentId: container.id,
+                options: [container, { id: "container-2", name: "Office crate" }],
+            }}
+            onOpenChange={vi.fn()}
+            onSave={onSave}
+        />,
+    );
+
+    const dropdown = screen.getByRole("combobox", { name: "Container" });
+    const save = screen.getByRole("button", { name: "Save changes" });
+    expect(dropdown).toHaveValue(container.id);
+
+    await userEvent.click(save);
+    expect(onSave.mock.lastCall?.[0]).not.toHaveProperty("container_id");
+
+    await userEvent.selectOptions(dropdown, screen.getByRole("option", { name: "Office crate" }));
+    await userEvent.click(save);
+    expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ container_id: "container-2" }));
+
+    await userEvent.selectOptions(dropdown, screen.getByRole("option", { name: "No container" }));
+    await userEvent.click(save);
+    expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ container_id: null }));
+});

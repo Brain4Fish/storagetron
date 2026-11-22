@@ -3,10 +3,13 @@ package model
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var ErrContainerNotFound = errors.New("container not found")
 
 type Item struct {
 	ID                uuid.UUID  `json:"id"`
@@ -179,16 +182,17 @@ type CreateItemRequest struct {
 }
 
 type UpdateItemRequest struct {
-	Name            string            `json:"name"`
-	Description     string            `json:"description"`
-	LocationID      *uuid.UUID        `json:"location_id"`
-	Quantity        Optional[int]     `json:"quantity"`
-	Category        Optional[string]  `json:"category"`
-	AcquisitionYear Optional[int16]   `json:"acquisition_year"`
-	Condition       Optional[string]  `json:"condition"`
-	SerialNumber    Optional[string]  `json:"serial_number"`
-	EstimatedValue  Optional[float64] `json:"estimated_value"`
-	ValueCurrency   Optional[string]  `json:"value_currency"`
+	Name            string              `json:"name"`
+	Description     string              `json:"description"`
+	LocationID      *uuid.UUID          `json:"location_id"`
+	ContainerID     Optional[uuid.UUID] `json:"container_id"`
+	Quantity        Optional[int]       `json:"quantity"`
+	Category        Optional[string]    `json:"category"`
+	AcquisitionYear Optional[int16]     `json:"acquisition_year"`
+	Condition       Optional[string]    `json:"condition"`
+	SerialNumber    Optional[string]    `json:"serial_number"`
+	EstimatedValue  Optional[float64]   `json:"estimated_value"`
+	ValueCurrency   Optional[string]    `json:"value_currency"`
 }
 
 type CreatePhotoRequest struct {

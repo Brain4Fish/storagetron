@@ -110,7 +110,9 @@ export type CreateItemRequest = InventoryRecordRequest & {
     value_currency?: string | null;
 };
 
-export type UpdateItemRequest = CreateItemRequest;
+export type UpdateItemRequest = CreateItemRequest & {
+    container_id?: string | null;
+};
 
 export type CreateContainerRequest = InventoryRecordRequest & {
     package_code?: string;

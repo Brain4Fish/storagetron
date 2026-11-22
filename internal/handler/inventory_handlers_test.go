@@ -182,6 +182,43 @@ func TestItemHandlerDeleteReturnsNoContent(t *testing.T) {
 	require.Equal(t, itemID, repo.deletedID)
 }
 
+func TestItemHandlerUpdateContainer(t *testing.T) {
+	itemID, containerID := uuid.New(), uuid.New()
+	for _, tt := range []struct {
+		name   string
+		body   string
+		update model.Optional[uuid.UUID]
+		err    error
+		status int
+	}{
+		{"omitted", `{"name":"Camera"}`, model.Optional[uuid.UUID]{}, nil, http.StatusOK},
+		{"clear", `{"name":"Camera","container_id":null}`, model.Optional[uuid.UUID]{Set: true}, nil, http.StatusOK},
+		{"move", `{"name":"Camera","container_id":"` + containerID.String() + `"}`,
+			model.Optional[uuid.UUID]{Set: true, Value: &containerID}, nil, http.StatusOK},
+		{"missing container", `{"name":"Camera","container_id":"` + containerID.String() + `"}`,
+			model.Optional[uuid.UUID]{Set: true, Value: &containerID}, model.ErrContainerNotFound, http.StatusNotFound},
+		{"invalid container ID", `{"name":"Camera","container_id":"invalid"}`,
+			model.Optional[uuid.UUID]{}, nil, http.StatusBadRequest},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &inventoryItemRepo{
+				item:      model.Item{ID: itemID, Name: "Camera", Quantity: 1, Condition: "used", SourceLanguage: "ru"},
+				updateErr: tt.err,
+			}
+			handler := NewItemHandler(newInventoryItemService(repo), zap.NewNop())
+			rec := httptest.NewRecorder()
+			handler.Update(rec, inventoryRequestWithParams(http.MethodPatch, "/items/"+itemID.String(), tt.body,
+				map[string]string{"id": itemID.String()}))
+
+			require.Equal(t, tt.status, rec.Code, rec.Body.String())
+			require.Equal(t, tt.update, repo.containerUpdate)
+			if tt.err != nil {
+				require.Contains(t, rec.Body.String(), tt.err.Error())
+			}
+		})
+	}
+}
+
 func TestItemHandlerAttachAndDetachLabelAreIdempotent(t *testing.T) {
 	itemID := uuid.New()
 	labelID := uuid.New()
@@ -540,10 +577,12 @@ func newInventoryPhotoService(repo *inventoryPhotoRepo, storage *inventoryStorag
 }
 
 type inventoryItemRepo struct {
-	pageItems  []model.Item
-	total      int
-	pageLimit  int
-	pageOffset int
+	containerUpdate model.Optional[uuid.UUID]
+	updateErr       error
+	pageItems       []model.Item
+	total           int
+	pageLimit       int
+	pageOffset      int
 
 	item    model.Item
 	getErr  error
@@ -579,7 +618,11 @@ func (r *inventoryItemRepo) Get(context.Context, uuid.UUID) (model.Item, error) 
 	return r.item, nil
 }
 
-func (r *inventoryItemRepo) Update(_ context.Context, _ uuid.UUID, item model.Item) error {
+func (r *inventoryItemRepo) Update(_ context.Context, _ uuid.UUID, item model.Item, container model.Optional[uuid.UUID]) error {
+	r.containerUpdate = container
+	if r.updateErr != nil {
+		return r.updateErr
+	}
 	r.updated = item
 	r.item = item
 	return nil

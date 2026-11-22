@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -163,8 +164,14 @@ func (r *ItemRepo) Get(ctx context.Context, id uuid.UUID) (model.Item, error) {
 	return i, err
 }
 
-func (r *ItemRepo) Update(ctx context.Context, id uuid.UUID, item model.Item) error {
-	cmd, err := r.db.Exec(ctx, `
+func (r *ItemRepo) Update(ctx context.Context, id uuid.UUID, item model.Item, container model.Optional[uuid.UUID]) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	cmd, err := tx.Exec(ctx, `
 		UPDATE items
 		SET name = $2,
 			description = $3,
@@ -186,7 +193,32 @@ func (r *ItemRepo) Update(ctx context.Context, id uuid.UUID, item model.Item) er
 	if cmd.RowsAffected() == 0 {
 		return pgx.ErrNoRows
 	}
-	return nil
+
+	if container.Set {
+		// Updating the item locks it until the membership change commits.
+		_, err = tx.Exec(ctx, `
+			DELETE FROM item_container
+			WHERE item_id = $1 AND container_id IS DISTINCT FROM $2::uuid
+		`, id, container.Value)
+		if err != nil {
+			return err
+		}
+		if container.Value != nil {
+			_, err = tx.Exec(ctx, `
+				INSERT INTO item_container (item_id, container_id)
+				VALUES ($1, $2)
+				ON CONFLICT (item_id, container_id) DO NOTHING
+			`, id, *container.Value)
+			if err != nil {
+				var pgErr *pgconn.PgError
+				if errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "item_container_container_id_fkey" {
+					return model.ErrContainerNotFound
+				}
+				return err
+			}
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *ItemRepo) Delete(ctx context.Context, id uuid.UUID) error {
